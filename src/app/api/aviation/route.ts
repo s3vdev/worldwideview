@@ -240,7 +240,7 @@ async function recordToSupabase(states: any[], timeSecs: number) {
 
     // Supabase allows bulk inserts, but a single payload with 5000+ planes can hit PostgREST limits (400 Bad Request)
     // We chunk the inserts into smaller batches.
-    const CHUNK_SIZE = 2000;
+    const CHUNK_SIZE = 500;
     let successCount = 0;
 
     for (let i = 0; i < records.length; i += CHUNK_SIZE) {

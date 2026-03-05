@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import { useStore } from "@/core/state/store";
 import { pluginManager } from "@/core/plugins/PluginManager";
 import { ImageryPicker } from "./ImageryPicker";
@@ -44,66 +46,90 @@ export function LayerPanel() {
         }
     };
 
+    const [activeTab, setActiveTab] = useState<"layers" | "imagery">("layers");
+
     return (
         <aside
             className={`sidebar sidebar--left glass-panel ${leftSidebarOpen ? "" : "sidebar--closed"
                 }`}
         >
-            <div className="sidebar__title">Data Layers</div>
-            {Object.entries(grouped).map(([category, plugins]) => (
-                <div key={category} style={{ marginBottom: "var(--space-lg)" }}>
-                    <div
-                        style={{
-                            fontSize: 10,
-                            fontWeight: 600,
-                            letterSpacing: "0.08em",
-                            textTransform: "uppercase",
-                            color: "var(--text-muted)",
-                            marginBottom: "var(--space-sm)",
-                            paddingLeft: "var(--space-md)",
-                        }}
-                    >
-                        {categoryLabels[category] || category}
-                    </div>
-                    {plugins.map((managed) => {
-                        const isEnabled = layers[managed.plugin.id]?.enabled || false;
-                        const count = (entitiesByPlugin[managed.plugin.id] || []).length;
+            <div className="sidebar__title">Data Sources</div>
 
-                        return (
+            <div className="panel-tabs">
+                <button
+                    className={`panel-tab ${activeTab === "layers" ? "panel-tab--active" : ""}`}
+                    onClick={() => setActiveTab("layers")}
+                >
+                    Data Layers
+                </button>
+                <button
+                    className={`panel-tab ${activeTab === "imagery" ? "panel-tab--active" : ""}`}
+                    onClick={() => setActiveTab("imagery")}
+                >
+                    Imagery
+                </button>
+            </div>
+
+            {activeTab === "layers" && (
+                <>
+                    {Object.entries(grouped).map(([category, plugins]) => (
+                        <div key={category} style={{ marginBottom: "var(--space-lg)" }}>
                             <div
-                                key={managed.plugin.id}
-                                className="layer-item"
-                                onClick={() => handleToggle(managed.plugin.id)}
+                                style={{
+                                    fontSize: 10,
+                                    fontWeight: 600,
+                                    letterSpacing: "0.08em",
+                                    textTransform: "uppercase",
+                                    color: "var(--text-muted)",
+                                    marginBottom: "var(--space-sm)",
+                                    paddingLeft: "var(--space-md)",
+                                }}
                             >
-                                <span className="layer-item__icon">
-                                    {typeof managed.plugin.icon === "string" ? (
-                                        managed.plugin.icon
-                                    ) : (
-                                        <managed.plugin.icon size={18} />
-                                    )}
-                                </span>
-                                <div className="layer-item__info">
-                                    <div className="layer-item__name">{managed.plugin.name}</div>
-                                    <div className="layer-item__desc">
-                                        {managed.plugin.description}
-                                    </div>
-                                </div>
-                                {isEnabled && count > 0 && (
-                                    <span className="layer-item__count">
-                                        {count.toLocaleString()}
-                                    </span>
-                                )}
-                                <div
-                                    className={`layer-item__toggle ${isEnabled ? "layer-item__toggle--on" : ""
-                                        }`}
-                                />
+                                {categoryLabels[category] || category}
                             </div>
-                        );
-                    })}
-                </div>
-            ))}
+                            {plugins.map((managed) => {
+                                const isEnabled = layers[managed.plugin.id]?.enabled || false;
+                                const count = (entitiesByPlugin[managed.plugin.id] || []).length;
 
-            <ImageryPicker />
+                                return (
+                                    <div
+                                        key={managed.plugin.id}
+                                        className="layer-item"
+                                        onClick={() => handleToggle(managed.plugin.id)}
+                                    >
+                                        <span className="layer-item__icon">
+                                            {typeof managed.plugin.icon === "string" ? (
+                                                managed.plugin.icon
+                                            ) : (
+                                                <managed.plugin.icon size={18} />
+                                            )}
+                                        </span>
+                                        <div className="layer-item__info">
+                                            <div className="layer-item__name">{managed.plugin.name}</div>
+                                            <div className="layer-item__desc">
+                                                {managed.plugin.description}
+                                            </div>
+                                        </div>
+                                        {isEnabled && count > 0 && (
+                                            <span className="layer-item__count">
+                                                {count.toLocaleString()}
+                                            </span>
+                                        )}
+                                        <div
+                                            className={`layer-item__toggle ${isEnabled ? "layer-item__toggle--on" : ""
+                                                }`}
+                                        />
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ))}
+                </>
+            )}
+
+            {activeTab === "imagery" && (
+                <ImageryPicker />
+            )}
         </aside>
     );
 }

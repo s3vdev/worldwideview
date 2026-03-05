@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
-import { getCachedVessels } from "@/lib/ais-stream";
+import { getCachedVessels, startAisStream } from "@/lib/ais-stream";
+
+export const dynamic = 'force-dynamic';
 
 /**
  * Maritime AIS proxy.
  * Returns live data from aisstream.io.
  */
 export async function GET() {
+    startAisStream(); // Ensure stream is initialized
+
     const vessels = getCachedVessels();
 
     // If the cache is completely empty, we return null to trigger the fallback demo data

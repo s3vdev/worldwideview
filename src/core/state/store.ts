@@ -99,6 +99,11 @@ interface DataSlice {
 // ─── Config Slice ────────────────────────────────────────────
 interface MapConfig {
     showLabels: boolean;
+    showFps: boolean;
+    resolutionScale: number;
+    msaaSamples: number;
+    enableFxaa: boolean;
+    maxScreenSpaceError: number;
 }
 
 interface ConfigSlice {
@@ -229,11 +234,7 @@ export const useStore = create<AppStore>((set, get) => ({
 
     // ── Config ───────────────────────────────────────────────
     dataConfig: {
-        pollingIntervals: {
-            aviation: 5000,
-            maritime: 60000,
-            wildfire: 300000,
-        },
+        pollingIntervals: {},  // Populated dynamically by PluginManager on registration
         cacheEnabled: true,
         cacheMaxAge: 3600000,
         maxConcurrentRequests: 5,
@@ -247,6 +248,11 @@ export const useStore = create<AppStore>((set, get) => ({
     },
     mapConfig: {
         showLabels: false,
+        showFps: false,
+        resolutionScale: 1.0,
+        msaaSamples: 1,
+        enableFxaa: false,
+        maxScreenSpaceError: 16,
     },
     updateDataConfig: (config) =>
         set((state) => ({

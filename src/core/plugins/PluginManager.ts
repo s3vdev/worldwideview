@@ -64,6 +64,12 @@ class PluginManager {
             console.error(`[PluginManager] Failed to initialize "${plugin.id}":`, err);
         }
 
+        // Populate store with the plugin's polling interval (so it's not hardcoded)
+        const currentIntervals = useStore.getState().dataConfig.pollingIntervals;
+        if (!currentIntervals[plugin.id]) {
+            useStore.getState().setPollingInterval(plugin.id, plugin.getPollingInterval());
+        }
+
         // Register polling
         pollingManager.register(
             plugin.id,
@@ -78,7 +84,6 @@ class PluginManager {
     }
 
     async enablePlugin(pluginId: string): Promise<void> {
-        console.log(`[TIME] PluginManager.enablePlugin called for ${pluginId} at ${performance.now()}`);
         const managed = this.plugins.get(pluginId);
         if (!managed) return;
         managed.enabled = true;
@@ -86,20 +91,15 @@ class PluginManager {
         // Try to load from cache immediately so UI feels responsive
         let cached = cacheLayer.get(pluginId);
         if (!cached) {
-            console.log(`[TIME] PluginManager checking persistent cache for ${pluginId} at ${performance.now()}`);
             cached = await cacheLayer.getFromPersistent(pluginId);
         }
 
         // If still enabled and we got cached data, emit it
         if (cached && managed.enabled) {
-            console.log(`[TIME] PluginManager loaded from cache for ${pluginId} (${cached.length} entities) at ${performance.now()}`);
             managed.entities = cached;
             dataBus.emit("dataUpdated", { pluginId, entities: cached });
-        } else {
-            console.log(`[TIME] PluginManager NO CACHE for ${pluginId} at ${performance.now()}`);
         }
 
-        console.log(`[TIME] PluginManager calling PollingManager.start for ${pluginId} at ${performance.now()}`);
         pollingManager.start(pluginId);
         dataBus.emit("layerToggled", { pluginId, enabled: true });
     }
@@ -172,7 +172,6 @@ class PluginManager {
     }
 
     private handleDataUpdate(pluginId: string, entities: GeoEntity[]): void {
-        console.log(`[TIME] PluginManager.handleDataUpdate for ${pluginId} (${entities.length} entities) at ${performance.now()}`);
         const managed = this.plugins.get(pluginId);
         if (!managed) return;
         managed.entities = entities;

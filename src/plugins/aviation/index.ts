@@ -6,6 +6,9 @@ import type {
     PluginContext,
     LayerConfig,
     CesiumEntityOptions,
+    SelectionBehavior,
+    ServerPluginConfig,
+    FilterDefinition,
 } from "@/core/plugins/PluginTypes";
 import { useStore } from "@/core/state/store";
 
@@ -186,5 +189,75 @@ export class AviationPlugin implements WorldPlugin {
             labelText: entity.label || undefined,
             labelFont: "11px JetBrains Mono, monospace",
         };
+    }
+
+    getSelectionBehavior(entity: GeoEntity): SelectionBehavior | null {
+        const isAirborne = !entity.properties.on_ground;
+        if (!isAirborne) return null;
+        return {
+            showTrail: true,
+            trailDurationSec: 60,
+            trailStepSec: 5,
+            trailColor: "#00fff7",
+            flyToOffsetMultiplier: 3,
+            flyToBaseDistance: 30000,
+        };
+    }
+
+    getServerConfig(): ServerPluginConfig {
+        return {
+            apiBasePath: "/api/aviation",
+            pollingIntervalMs: 5000,
+            requiresAuth: true,
+            historyEnabled: true,
+            availabilityEnabled: true,
+        };
+    }
+
+    getFilterDefinitions(): FilterDefinition[] {
+        return [
+            {
+                id: "origin_country",
+                label: "Country",
+                type: "select",
+                propertyKey: "origin_country",
+                options: [
+                    { value: "United States", label: "United States" },
+                    { value: "China", label: "China" },
+                    { value: "United Kingdom", label: "United Kingdom" },
+                    { value: "Germany", label: "Germany" },
+                    { value: "France", label: "France" },
+                    { value: "Japan", label: "Japan" },
+                    { value: "Australia", label: "Australia" },
+                    { value: "Canada", label: "Canada" },
+                    { value: "India", label: "India" },
+                    { value: "Brazil", label: "Brazil" },
+                    { value: "Russia", label: "Russia" },
+                    { value: "Turkey", label: "Turkey" },
+                    { value: "South Korea", label: "South Korea" },
+                    { value: "Indonesia", label: "Indonesia" },
+                    { value: "Mexico", label: "Mexico" },
+                ],
+            },
+            {
+                id: "altitude",
+                label: "Altitude (m)",
+                type: "range",
+                propertyKey: "altitude_m",
+                range: { min: 0, max: 15000, step: 500 },
+            },
+            {
+                id: "on_ground",
+                label: "On Ground",
+                type: "boolean",
+                propertyKey: "on_ground",
+            },
+            {
+                id: "callsign",
+                label: "Callsign",
+                type: "text",
+                propertyKey: "callsign",
+            },
+        ];
     }
 }

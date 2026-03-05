@@ -81,6 +81,11 @@ export default function GlobeView() {
     const entitiesByPlugin = useStore((s) => s.entitiesByPlugin);
     const layers = useStore((s) => s.layers);
     const showLabels = useStore((s) => s.mapConfig.showLabels);
+    const showFps = useStore((s) => s.mapConfig.showFps);
+    const resolutionScale = useStore((s) => s.mapConfig.resolutionScale);
+    const msaaSamples = useStore((s) => s.mapConfig.msaaSamples);
+    const enableFxaa = useStore((s) => s.mapConfig.enableFxaa);
+    const maxScreenSpaceError = useStore((s) => s.mapConfig.maxScreenSpaceError);
     const bordersDataSourceRef = useRef<import("cesium").GeoJsonDataSource | null>(null);
     const trailEntityRef = useRef<CesiumEntity | null>(null);
 
@@ -298,9 +303,12 @@ export default function GlobeView() {
         viewerRef.current = viewer;
 
         // Performance optimizations
-        viewer.scene.requestRenderMode = false; // Disabled to allow dynamic entity updates
+        viewer.scene.requestRenderMode = false;
         viewer.scene.maximumRenderTimeChange = Infinity;
-        viewer.scene.debugShowFramesPerSecond = false;
+        viewer.scene.debugShowFramesPerSecond = showFps;
+        viewer.resolutionScale = resolutionScale;
+        viewer.scene.msaaSamples = msaaSamples;
+        viewer.scene.postProcessStages.fxaa.enabled = enableFxaa;
 
         // Remove default imagery/terrain
         viewer.scene.globe.show = false;
@@ -310,6 +318,7 @@ export default function GlobeView() {
             const tileset = await createGooglePhotorealistic3DTileset({
                 key: process.env.GOOGLE_MAPS_API_KEY || undefined,
             });
+            tileset.maximumScreenSpaceError = maxScreenSpaceError;
             viewer.scene.primitives.add(tileset);
         } catch (err) {
             console.warn("[GlobeView] Failed to load Google 3D Tiles, falling back to default globe:", err);
@@ -432,6 +441,12 @@ export default function GlobeView() {
             const R_WGS84_MIN = 6356752.0; // Safe underestimate for occlusion
             const R2 = R_WGS84_MIN * R_WGS84_MIN;
 
+            // Throttling: only update all entities every N frames for general movement
+            // but update selected/hovered every frame.
+            const frameCount = (viewer as any)._wwvFrameCount || 0;
+            (viewer as any)._wwvFrameCount = frameCount + 1;
+            const isFullUpdate = frameCount % 2 === 0; // Update movement every 2nd frame
+
             // Camera distance from the center of the earth squared
             const camDistSqr = Cartesian3.magnitudeSquared(camPos);
 
@@ -445,72 +460,78 @@ export default function GlobeView() {
                 const item = animatables[i];
                 const { primitive, labelPrimitive, entity, posRef } = item;
 
+                const isSelected = state.selectedEntity && state.selectedEntity.id === entity.id;
+                const isHovered = hoveredEntityIdRef.current === entity.id;
+
                 // --- Position Extrapolation ---
                 if (entity.timestamp && entity.speed !== undefined && entity.heading !== undefined) {
-                    // Calculate time difference in seconds.
-                    const dtSec = (nowMs - entity.timestamp.getTime()) / 1000;
+                    // Only calculate movement if it's a full update frame OR if the entity is interactive
+                    if (isFullUpdate || isSelected || isHovered) {
+                        // Calculate time difference in seconds.
+                        const dtSec = (nowMs - entity.timestamp.getTime()) / 1000;
 
-                    // Allow extrapolation up to 5 minutes forward or backward
-                    if (Math.abs(dtSec) <= 300) {
-                        // Pre-calculate the Cartesian3 velocity vector ONLY ONCE and cache it on the item
-                        if (!(item as any).velocityVector) {
-                            const speedMps = entity.speed;
-                            const headingRad = CesiumMath.toRadians(entity.heading);
+                        // Allow extrapolation up to 5 minutes forward or backward
+                        if (Math.abs(dtSec) <= 300) {
+                            // Pre-calculate the Cartesian3 velocity vector ONLY ONCE and cache it on the item
+                            if (!(item as any).velocityVector) {
+                                const speedMps = entity.speed;
+                                const headingRad = CesiumMath.toRadians(entity.heading);
 
-                            // Get a unit vector pointing North at the entity's position
-                            const surfaceNormal = Ellipsoid.WGS84.geodeticSurfaceNormal(posRef);
-                            const northPole = new Cartesian3(0, 0, 1);
-                            let northDir = new Cartesian3();
-                            // If the entity is exactly at the north pole, this cross product approaches 0.
-                            // We handle this by picking an arbitrary tangent if needed, 
-                            // but generally airplanes aren't at lat 90.0000.
-                            Cartesian3.cross(northPole, surfaceNormal, northDir); // Points East
-                            Cartesian3.cross(surfaceNormal, northDir, northDir);  // Points North
-                            Cartesian3.normalize(northDir, northDir);
+                                // Get a unit vector pointing North at the entity's position
+                                const surfaceNormal = Ellipsoid.WGS84.geodeticSurfaceNormal(posRef);
+                                const northPole = new Cartesian3(0, 0, 1);
+                                let northDir = new Cartesian3();
+                                // If the entity is exactly at the north pole, this cross product approaches 0.
+                                // We handle this by picking an arbitrary tangent if needed, 
+                                // but generally airplanes aren't at lat 90.0000.
+                                Cartesian3.cross(northPole, surfaceNormal, northDir); // Points East
+                                Cartesian3.cross(surfaceNormal, northDir, northDir);  // Points North
+                                Cartesian3.normalize(northDir, northDir);
 
-                            // Get a unit vector pointing East
-                            let eastDir = new Cartesian3();
-                            Cartesian3.cross(northDir, surfaceNormal, eastDir); // Points East
-                            Cartesian3.normalize(eastDir, eastDir);
+                                // Get a unit vector pointing East
+                                let eastDir = new Cartesian3();
+                                Cartesian3.cross(northDir, surfaceNormal, eastDir); // Points East
+                                Cartesian3.normalize(eastDir, eastDir);
 
-                            // Combine North and East based on heading to get the final velocity vector
-                            // A heading of 0 means North (cos(0)=1, sin(0)=0). Heading 90 means East.
-                            const northComp = Math.cos(headingRad);
-                            const eastComp = Math.sin(headingRad);
+                                // Combine North and East based on heading to get the final velocity vector
+                                // A heading of 0 means North (cos(0)=1, sin(0)=0). Heading 90 means East.
+                                const northComp = Math.cos(headingRad);
+                                const eastComp = Math.sin(headingRad);
 
-                            const velocityVector = new Cartesian3();
-                            Cartesian3.multiplyByScalar(northDir, northComp, velocityVector);
-                            let tempEast = new Cartesian3();
-                            Cartesian3.multiplyByScalar(eastDir, eastComp, tempEast);
-                            Cartesian3.add(velocityVector, tempEast, velocityVector);
+                                const velocityVector = new Cartesian3();
+                                Cartesian3.multiplyByScalar(northDir, northComp, velocityVector);
+                                let tempEast = new Cartesian3();
+                                Cartesian3.multiplyByScalar(eastDir, eastComp, tempEast);
+                                Cartesian3.add(velocityVector, tempEast, velocityVector);
 
-                            // Scale by speed (meters per second)
-                            Cartesian3.multiplyByScalar(velocityVector, speedMps, velocityVector);
+                                // Scale by speed (meters per second)
+                                Cartesian3.multiplyByScalar(velocityVector, speedMps, velocityVector);
 
-                            // Cache the original calculated position to add the vector onto
-                            (item as any).basePosition = Cartesian3.clone(posRef);
-                            (item as any).velocityVector = velocityVector;
-                        }
+                                // Cache the original calculated position to add the vector onto
+                                (item as any).basePosition = Cartesian3.clone(posRef);
+                                (item as any).velocityVector = velocityVector;
+                            }
 
-                        // Apply the cached velocity vector (simple vector addition, NO TRIGONOMETRY)
-                        const vel = (item as any).velocityVector as import("cesium").Cartesian3;
-                        const basePos = (item as any).basePosition as import("cesium").Cartesian3;
+                            // Apply the cached velocity vector (simple vector addition, NO TRIGONOMETRY)
+                            const vel = (item as any).velocityVector as import("cesium").Cartesian3;
+                            const basePos = (item as any).basePosition as import("cesium").Cartesian3;
 
-                        // We use a scratch Cartesian3 if needed, but we can do it inline by modifying posRef
-                        const displacement = new Cartesian3();
-                        Cartesian3.multiplyByScalar(vel, dtSec, displacement);
-                        Cartesian3.add(basePos, displacement, posRef);
+                            // We use a scratch Cartesian3 if needed, but we can do it inline by modifying posRef
+                            const displacement = new Cartesian3();
+                            Cartesian3.multiplyByScalar(vel, dtSec, displacement);
+                            Cartesian3.add(basePos, displacement, posRef);
 
-                        // Note: For long distances (>100s of km), moving via a linear 3D tangent vector 
-                        // will cause the plane to "fly off" the curved earth into space.
-                        // However, since we only extrapolate for max 5 mins at typical plane speeds (~250m/s),
-                        // the max linear distance is ~75km. Over 75km, the Earth's curvature drop is ~440 meters.
-                        // This visual error is negligible at global zoom levels and barely noticeable at low zoom.
-                        // The performance gain of skipping 10,000 trig calls 60x a second is worth the slight altitude delta.
+                            // Note: For long distances (>100s of km), moving via a linear 3D tangent vector 
+                            // will cause the plane to "fly off" the curved earth into space.
+                            // However, since we only extrapolate for max 5 mins at typical plane speeds (~250m/s),
+                            // the max linear distance is ~75km. Over 75km, the Earth's curvature drop is ~440 meters.
+                            // This visual error is negligible at global zoom levels and barely noticeable at low zoom.
+                            // The performance gain of skipping 10,000 trig calls 60x a second is worth the slight altitude delta.
 
-                        primitive.position = posRef;
-                        if (labelPrimitive) {
-                            labelPrimitive.position = posRef;
+                            primitive.position = posRef;
+                            if (labelPrimitive) {
+                                labelPrimitive.position = posRef;
+                            }
                         }
                     }
                 }
@@ -525,8 +546,6 @@ export default function GlobeView() {
                 primitive.show = isVisible;
 
                 // --- Highlight ---
-                const isSelected = state.selectedEntity && state.selectedEntity.id === entity.id;
-                const isHovered = hoveredEntityIdRef.current === entity.id;
 
                 if (isSelected) {
                     // Selected: bright cyan with glow effect
@@ -582,6 +601,23 @@ export default function GlobeView() {
             }
         };
 
+        // Dynamic update of scene settings when store changes
+        if (viewer) {
+            viewer.scene.debugShowFramesPerSecond = showFps;
+            viewer.resolutionScale = resolutionScale;
+            viewer.scene.msaaSamples = msaaSamples;
+            viewer.scene.postProcessStages.fxaa.enabled = enableFxaa;
+
+            // Update tileset SSE if it exists
+            const primitives = (viewer.scene.primitives as any);
+            for (let i = 0; i < primitives.length; i++) {
+                const p = primitives.get(i);
+                if (p && p.maximumScreenSpaceError !== undefined) {
+                    p.maximumScreenSpaceError = maxScreenSpaceError;
+                }
+            }
+        }
+
         viewer.scene.preUpdate.addEventListener(updatePositions);
 
         return () => {
@@ -604,10 +640,15 @@ export default function GlobeView() {
 
         if (!selectedEntity) return;
 
+        // Look up selection behavior from the plugin (generic, no plugin-specific checks)
+        const managed = pluginManager.getPlugin(selectedEntity.pluginId);
+        const selectionBehavior = managed?.plugin.getSelectionBehavior?.(selectedEntity) ?? null;
+
         // Fly camera to the selected entity
         const entityAlt = selectedEntity.altitude || 0;
-        // Camera offset: higher altitude entities get a wider view
-        const viewDistance = Math.max(50000, entityAlt * 3 + 30000);
+        const offsetMultiplier = selectionBehavior?.flyToOffsetMultiplier ?? 3;
+        const baseDistance = selectionBehavior?.flyToBaseDistance ?? 30000;
+        const viewDistance = Math.max(50000, entityAlt * offsetMultiplier + baseDistance);
         viewer.camera.flyTo({
             destination: Cartesian3.fromDegrees(
                 selectedEntity.longitude,
@@ -622,17 +663,19 @@ export default function GlobeView() {
             duration: 1.5,
         });
 
-        // Create a trail polyline for aviation entities
-        if (selectedEntity.pluginId === "aviation" && selectedEntity.heading !== undefined) {
-            // Build a short trail behind the entity (extrapolate backward ~60s)
+        // Render trail if the plugin opts in via getSelectionBehavior()
+        if (selectionBehavior?.showTrail && selectedEntity.heading !== undefined) {
+            const trailDuration = selectionBehavior.trailDurationSec ?? 60;
+            const trailStep = selectionBehavior.trailStepSec ?? 5;
+            const trailColor = selectionBehavior.trailColor ?? '#00fff7';
+
             const positions: Cartesian3[] = [];
-            const speed = selectedEntity.speed || 200; // fallback to ~200 m/s
+            const speed = selectedEntity.speed || 200;
             const headingRad = CesiumMath.toRadians(selectedEntity.heading);
 
             // Create trail points going backward from current position
-            for (let t = 60; t >= 0; t -= 5) {
+            for (let t = trailDuration; t >= 0; t -= trailStep) {
                 const dist = speed * t;
-                // Move backward: opposite direction of heading
                 const dLat = -Math.cos(headingRad) * dist / 111320;
                 const dLon = -Math.sin(headingRad) * dist / (111320 * Math.cos(CesiumMath.toRadians(selectedEntity.latitude)));
                 positions.push(Cartesian3.fromDegrees(
@@ -647,7 +690,7 @@ export default function GlobeView() {
                     positions,
                     width: 2,
                     material: new PolylineDashMaterialProperty({
-                        color: Color.fromCssColorString('#00fff7').withAlpha(0.6),
+                        color: Color.fromCssColorString(trailColor).withAlpha(0.6),
                         dashLength: 16,
                     }),
                 } as any,

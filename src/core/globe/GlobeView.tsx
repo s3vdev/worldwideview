@@ -6,9 +6,12 @@ import {
     Ion,
     createGooglePhotorealistic3DTileset,
     Cartesian3,
+    Cartographic,
     Entity as CesiumEntity,
     Matrix4,
     Ellipsoid,
+    Math as CesiumMath,
+    HeadingPitchRange,
 } from "cesium";
 import type { Viewer as CesiumViewer } from "cesium";
 import { useStore } from "@/core/state/store";
@@ -48,6 +51,7 @@ export default function GlobeView() {
     const maxScreenSpaceError = useStore((s) => s.mapConfig.maxScreenSpaceError);
     const filters = useStore((s) => s.filters);
     const lockedEntityId = useStore((s) => s.lockedEntityId);
+    const setCameraPosition = useStore((s) => s.setCameraPosition);
 
     // Camera position from store
     const cameraLat = useStore((s) => s.cameraLat);
@@ -82,7 +86,9 @@ export default function GlobeView() {
         // Create a hidden entity for camera tracking/flying
         const entity = viewer.entities.add({
             id: "__wwv_selection_anchor",
-            show: false,
+            point: {
+                pixelSize: 0,
+            }
         });
         selectionEntityRef.current = entity;
 
@@ -111,11 +117,43 @@ export default function GlobeView() {
         return subscribeToCameraPresets(viewerRef.current);
     }, [viewerReady]);
 
-    // Camera position sync from store
+    // Camera Sync: Camera -> Store (updates stats panel)
     useEffect(() => {
-        if (!viewerRef.current) return;
-        flyToPosition(viewerRef.current, cameraLat, cameraLon, cameraAlt, cameraHeading, cameraPitch);
-    }, [cameraLat, cameraLon, cameraAlt, cameraHeading, cameraPitch]);
+        const viewer = viewerRef.current;
+        if (!viewer || !viewerReady) return;
+
+        const updateStore = () => {
+            const camera = viewer.camera;
+            const cartographic = Cartographic.fromCartesian(camera.position);
+
+            const lat = CesiumMath.toDegrees(cartographic.latitude);
+            const lon = CesiumMath.toDegrees(cartographic.longitude);
+            const alt = cartographic.height;
+            const heading = CesiumMath.toDegrees(camera.heading);
+            const pitch = CesiumMath.toDegrees(camera.pitch);
+            const roll = CesiumMath.toDegrees(camera.roll);
+
+            // Use functional update to avoid unnecessary re-renders if values are close enough
+            // But for HUD we want real-time, so we just call it.
+            setCameraPosition(lat, lon, alt, heading, pitch, roll);
+        };
+
+        viewer.camera.changed.addEventListener(updateStore);
+        viewer.camera.moveEnd.addEventListener(updateStore);
+
+        return () => {
+            if (!viewer.isDestroyed()) {
+                viewer.camera.changed.removeEventListener(updateStore);
+                viewer.camera.moveEnd.removeEventListener(updateStore);
+            }
+        };
+    }, [viewerReady, setCameraPosition]);
+
+    // Camera Sync: Store -> Camera (one-way flyTo for external store changes)
+    // We only trigger this if it's NOT a typical user movement (e.g. from preset)
+    // To keep it simple, we'll leave it out for now as the buttons now use direct dataBus events
+    // that don't go through the store's lat/lon properties for movement.
+
 
     // Click/hover handlers
     useEffect(() => {
@@ -215,13 +253,63 @@ export default function GlobeView() {
             viewer.camera.lookAtTransform(Matrix4.IDENTITY);
         });
 
-        const unsubGoTo = dataBus.on("cameraGoTo", () => {
-            console.log("[GlobeView] Native flyTo selectionEntity");
-            if (selectionEntityRef.current) {
-                viewer.flyTo(selectionEntityRef.current, {
+        const unsubGoTo = dataBus.on("cameraGoTo", ({ lat, lon, alt }) => {
+            // Add a slight delay to avoid any immediate state-change cancellations from React
+            setTimeout(() => {
+                const targetPosition = Cartesian3.fromDegrees(lon, lat, alt || 0);
+                const cameraPosition = viewer.camera.positionWC;
+
+                // Calculate direction from camera to the target object
+                const direction = Cartesian3.subtract(targetPosition, cameraPosition, new Cartesian3());
+                Cartesian3.normalize(direction, direction);
+
+                // Enforce maximum pitch of -30 degrees (so it doesn't look too horizontal)
+                const targetLocalUp = Ellipsoid.WGS84.geodeticSurfaceNormal(targetPosition, new Cartesian3());
+                const pitchDot = Cartesian3.dot(direction, targetLocalUp);
+                let pitch = Math.asin(pitchDot);
+                const maxPitch = CesiumMath.toRadians(-30);
+
+                if (pitch > maxPitch) {
+                    pitch = maxPitch;
+                    // Extract the horizontal component of the direction to reconstruct it
+                    const vertComponent = Cartesian3.multiplyByScalar(targetLocalUp, pitchDot, new Cartesian3());
+                    const horiz = Cartesian3.subtract(direction, vertComponent, new Cartesian3());
+
+                    if (Cartesian3.magnitude(horiz) > 0.0001) {
+                        Cartesian3.normalize(horiz, horiz);
+                        const cosP = Math.cos(pitch);
+                        const sinP = Math.sin(pitch);
+                        const newHoriz = Cartesian3.multiplyByScalar(horiz, cosP, new Cartesian3());
+                        const newVert = Cartesian3.multiplyByScalar(targetLocalUp, sinP, new Cartesian3());
+                        Cartesian3.add(newHoriz, newVert, direction);
+                        Cartesian3.normalize(direction, direction);
+                    }
+                }
+
+                const viewDistance = Math.max(10000, (alt || 0) * 2 + 20000);
+
+                // Offset backwards by its looking direction
+                const offset = Cartesian3.multiplyByScalar(direction, -viewDistance, new Cartesian3());
+                const destination = Cartesian3.add(targetPosition, offset, new Cartesian3());
+
+                // Keep roll at 0 by using the Earth's local normal to force a horizontal right vector
+                const localUp = Ellipsoid.WGS84.geodeticSurfaceNormal(destination, new Cartesian3());
+                const right = Cartesian3.cross(direction, localUp, new Cartesian3());
+                Cartesian3.normalize(right, right);
+
+                // The new 'up' vector will be perpendicular to both, ensuring 0 roll
+                const up = Cartesian3.cross(right, direction, new Cartesian3());
+                Cartesian3.normalize(up, up);
+
+                viewer.camera.flyTo({
+                    destination: destination,
+                    orientation: {
+                        direction: direction,
+                        up: up,
+                    },
                     duration: 1.5,
                 });
-            }
+            }, 50);
         });
 
         return () => {

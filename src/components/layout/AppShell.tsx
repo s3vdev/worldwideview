@@ -13,6 +13,7 @@ import { pluginRegistry } from "@/core/plugins/PluginRegistry";
 import { AviationPlugin } from "@/plugins/aviation";
 import { MaritimePlugin } from "@/plugins/maritime";
 import { WildfirePlugin } from "@/plugins/wildfire";
+import { BordersPlugin } from "@/plugins/borders";
 import { useStore } from "@/core/state/store";
 import { dataBus } from "@/core/data/DataBus";
 import { PanelToggleArrows } from "@/components/layout/PanelToggleArrows";
@@ -51,6 +52,7 @@ export function AppShell() {
             pluginRegistry.register(new AviationPlugin());
             pluginRegistry.register(new MaritimePlugin());
             pluginRegistry.register(new WildfirePlugin());
+            pluginRegistry.register(new BordersPlugin());
 
             // 2. Init PluginManager
             await pluginManager.init();

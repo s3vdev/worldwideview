@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
+    "predev": "node scripts/copy-cesium.mjs",
+    "copy-cesium": "node scripts/copy-cesium.mjs",
     "build": "next build --webpack",
     "start": "next start"
   },

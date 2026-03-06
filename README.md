@@ -1,34 +1,27 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# WorldWideView
 
-## Getting Started
+**WorldWideView** is a high-performance, real-time 3D globe platform built with [Next.js](https://nextjs.org), [CesiumJS](https://cesium.com/cesiumjs/), and [Resium](https://resium.com/).
 
-First, run the development server:
+It solves the problem of visualizing massive, real-time geospatial datasets (aviation, maritime, wildfire) in a single, unified, and highly performant dashboard.
+
+## 🚀 Quick Start
 
 ```bash
+git clone https://github.com/your-repo/worldwideview.git
+cd worldwideview
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Visit `http://localhost:3000` to see the live globe.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 📖 Key Documentation Sections
 
-## Learn More
+- **[Setup & Installation Guide](docs/SETUP.md)**: Detailed environment and local development setup.
+- **[Architecture (Engineering Depth)](docs/ARCHITECTURE.md)**: Deep dive into the Cesium rendering pipeline, event data bus, and performance optimizations.
+- **[Plugin System Guide](docs/PLUGIN_GUIDE.md)**: How to build and register custom data layers.
+- **[User Guide](docs/USER_GUIDE.md)**: Application features and navigation tips.
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+For a full list of resources, see the **[Documentation Index](docs/index.md)**.

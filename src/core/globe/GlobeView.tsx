@@ -21,7 +21,7 @@ import type { GeoEntity, CesiumEntityOptions } from "@/core/plugins/PluginTypes"
 import { applyFilters } from "@/core/filters/filterEngine";
 import { flyToPreset, flyToPosition, subscribeToCameraPresets } from "./CameraController";
 import { setupInteractionHandlers } from "./InteractionHandler";
-import { BordersManager } from "./BordersManager";
+import { useBorders } from "./useBorders";
 import { initPrimitiveCollections, renderEntities, AnimatableItem } from "./EntityRenderer";
 import { createUpdateLoop } from "./AnimationLoop";
 import { handleEntitySelection, cleanupTrail } from "./SelectionHandler";
@@ -38,7 +38,6 @@ export default function GlobeView() {
     const hoveredEntityIdRef = useRef<string | null>(null);
     const trailEntityRef = useRef<CesiumEntity | null>(null);
     const selectionEntityRef = useRef<CesiumEntity | null>(null);
-    const bordersManagerRef = useRef(new BordersManager());
     const animatablesMapRef = useRef(new Map<string, AnimatableItem>());
     const [viewerReady, setViewerReady] = useState(false);
 
@@ -81,12 +80,20 @@ export default function GlobeView() {
     // Unified Imagery & Scene Mode Management
     useImageryManager(viewerRef.current);
 
+    // Borders & Labels Management
+    useBorders(viewerRef.current, showLabels);
+
     // Initialization of Selection Entity
     useEffect(() => {
         const viewer = viewerRef.current;
         if (!viewer || !viewerReady) return;
 
         // Create a hidden entity for camera tracking/flying
+        if (!viewer.entities) {
+            console.warn("[GlobeView] Viewer entities collection not available during selection anchor init");
+            return;
+        }
+
         const entity = viewer.entities.add({
             id: "__wwv_selection_anchor",
             point: {
@@ -96,7 +103,7 @@ export default function GlobeView() {
         selectionEntityRef.current = entity;
 
         return () => {
-            if (!viewer.isDestroyed()) {
+            if (viewer && !viewer.isDestroyed() && viewer.entities) {
                 viewer.entities.remove(entity);
             }
         };
@@ -123,7 +130,7 @@ export default function GlobeView() {
     // Camera Sync: Camera -> Store (updates stats panel)
     useEffect(() => {
         const viewer = viewerRef.current;
-        if (!viewer || !viewerReady) return;
+        if (!viewer || !viewer.camera || !viewerReady) return;
 
         const updateStore = () => {
             const camera = viewer.camera;
@@ -180,18 +187,6 @@ export default function GlobeView() {
         if (!viewerRef.current) return;
         return setupInteractionHandlers(viewerRef.current, hoveredEntityIdRef);
     }, [viewerReady]);
-
-    // Borders/labels
-    useEffect(() => {
-        const viewer = viewerRef.current;
-        if (!viewer) return;
-        // Globe visibility is now managed by useImageryManager
-        if (showLabels) {
-            bordersManagerRef.current.show(viewer);
-        } else {
-            bordersManagerRef.current.hide(viewer);
-        }
-    }, [showLabels, viewerReady]);
 
     // Viewer initialization
     const handleViewerReady = useCallback(async (viewer: CesiumViewer) => {

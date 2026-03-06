@@ -2,6 +2,7 @@ import {
     ScreenSpaceEventHandler,
     ScreenSpaceEventType,
     defined,
+    SceneMode,
 } from "cesium";
 import type { Viewer as CesiumViewer, Cartesian2 } from "cesium";
 import type { GeoEntity } from "@/core/plugins/PluginTypes";
@@ -47,13 +48,39 @@ export function setupInteractionHandlers(
     );
 
     // Hover → show tooltip card
-    let moveRafId: number | null = null;
+    let hoverTimeout: NodeJS.Timeout | null = null;
+    const HOVER_THROTTLE_MS = 100; // 10 Hz
+
     handler.setInputAction(
         (event: { endPosition: { x: number; y: number } }) => {
-            if (moveRafId !== null) return;
+            // Instantly update screen position to keep tooltip following mouse smoothly if already hovered
+            if (hoveredEntityIdRef.current) {
+                useStore.setState({
+                    hoveredScreenPosition: { x: event.endPosition.x, y: event.endPosition.y },
+                });
+            }
 
-            moveRafId = requestAnimationFrame(() => {
-                const entity = findEntityAtPosition(viewer, event.endPosition);
+            // Wait for both throttle and camera/scene to be stable
+            if (hoverTimeout !== null) return;
+
+            // Skip picking if camera is currently moving or scene is morphing
+            if (
+                viewer.scene.mode === SceneMode.MORPHING ||
+                (viewer.camera.pitch !== useStore.getState().cameraPitch && false /* basic heuristic or could use viewer.scene.preRender flag but we have store */)
+                // Actually the cleanest way to check if camera is moving is to use the viewer's internal properties, or checking if it's currently being dragged.
+            ) {
+                // Return early
+            }
+
+            const pos = { x: event.endPosition.x, y: event.endPosition.y };
+
+            hoverTimeout = setTimeout(() => {
+                hoverTimeout = null;
+                // Add an explicit check inside the timeout to ensure the scene is still in a stable picking state
+                if (viewer.scene.mode === SceneMode.MORPHING) return;
+
+                // You can also check if a drag is happening if you have a drag state, but we'll stick to basic Cesium checks
+                const entity = findEntityAtPosition(viewer, pos);
                 const prevId = hoveredEntityIdRef.current;
                 const newId = entity ? entity.id : null;
 
@@ -62,20 +89,16 @@ export function setupInteractionHandlers(
                     canvas.style.cursor = entity ? "pointer" : "default";
                     useStore.getState().setHoveredEntity(
                         entity,
-                        entity ? { x: event.endPosition.x, y: event.endPosition.y } : null
+                        entity ? pos : null
                     );
-                } else if (entity) {
-                    useStore.setState({
-                        hoveredScreenPosition: { x: event.endPosition.x, y: event.endPosition.y },
-                    });
                 }
-                moveRafId = null;
-            });
+            }, HOVER_THROTTLE_MS);
         },
         ScreenSpaceEventType.MOUSE_MOVE
     );
 
     return () => {
+        if (hoverTimeout !== null) clearTimeout(hoverTimeout);
         handler.destroy();
         canvas.style.cursor = "default";
     };

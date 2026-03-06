@@ -25,13 +25,33 @@ Build custom data layer plugins for the WorldWideView 3D globe platform. This gu
 └─────────────────────────────────────────────────┘
 ```
 
+### 🔄 Plugin Lifecycle
+
+1. **Instantiation**: Your class is instantiated and passed to `pluginRegistry.register()`.
+2. **Registration**: The `PluginManager` discovers the plugin in the registry during the boot sequence.
+3. **Initialization**: `initialize(ctx)` is called. This is where you should set up your domain-specific API clients or static data.
+4. **Enabled State**: When a user toggles the layer in the UI, the `PluginManager` starts the polling cycle.
+5. **Fetch/Render Cycle**: `fetch()` is called periodically; `renderEntity()` is called for result.
+6. **Destruction**: `destroy()` is called if the plugin is unregistered or the application is unmounted.
+
 ### Data Flow
 
-1. **Registration** — Your plugin is registered with `PluginManager`
-2. **Initialization** — `initialize(ctx)` is called with a `PluginContext`
-3. **Polling** — `PollingManager` calls `fetch()` at your declared interval
-4. **Rendering** — `renderEntity()` maps each `GeoEntity` to Cesium visuals
-5. **Events** — `DataBus` broadcasts data updates, selections, and layer toggles
+```mermaid
+sequenceDiagram
+    participant PM as PluginManager
+    participant P as YourPlugin
+    participant DB as DataBus
+    
+    PM->>P: initialize(ctx)
+    Note over PM, P: User toggles layer ON
+    loop Every getPollingInterval()
+        PM->>P: fetch(timeRange)
+        P-->>PM: GeoEntity[]
+        PM->>DB: emit("dataUpdated")
+    end
+    Note over PM, P: User toggles layer OFF
+    PM->>PM: Stop Polling
+```
 
 ---
 
@@ -167,16 +187,17 @@ Return the polling interval in milliseconds. This determines how often `fetch()`
 
 #### `getLayerConfig(): LayerConfig`
 
-Return the default layer configuration:
+Return the default layer configuration. These values are used to initialize the UI and the renderer:
 
 ```typescript
 interface LayerConfig {
-    color: string;              // Default CSS color
-    iconUrl?: string;           // Default icon URL
-    clusterEnabled: boolean;    // Enable spatial clustering
-    clusterDistance: number;     // Cluster radius in pixels
-    minZoomLevel?: number;      // Minimum zoom to show entities
-    maxEntities?: number;       // Cap for performance
+    color: string;              // Default CSS color for primary visualization
+    iconUrl?: string;           // Default icon for billboards (if applicable)
+    clusterEnabled: boolean;    // Enable spatial clustering at high zoom levels
+    clusterDistance: number;     // Cluster radius in pixels (suggested: 40)
+    minZoomLevel?: number;      // Hide entities when camera is too far (meters)
+    maxEntities?: number;       // Limit for performance safety
+    showLabelsByDefault?: boolean; // If true, labels show without hover
 }
 ```
 

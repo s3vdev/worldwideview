@@ -14,7 +14,7 @@ As a real-time situational awareness platform, it turns raw geospatial signalsâ€
 ## Quick Start
 
 ```bash
-git clone https://github.com/silvertakana/worldwideview.git
+git clone https://github.com/s3vdev/worldwideview.git
 cd worldwideview
 npm install
 npm run dev

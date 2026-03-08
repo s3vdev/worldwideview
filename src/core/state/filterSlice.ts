@@ -6,6 +6,7 @@ import type { FilterValue } from "@/core/plugins/PluginTypes";
 export interface FilterSlice {
     filters: Record<string, Record<string, FilterValue>>;
     setFilter: (pluginId: string, filterId: string, value: FilterValue) => void;
+    removeFilter: (pluginId: string, filterId: string) => void;
     clearFilters: (pluginId: string) => void;
     clearAllFilters: () => void;
 }
@@ -22,6 +23,17 @@ export const createFilterSlice: StateCreator<AppStore, [], [], FilterSlice> = (s
                 },
             },
         })),
+    removeFilter: (pluginId, filterId) =>
+        set((state) => {
+            const pluginFilters = { ...state.filters[pluginId] };
+            delete pluginFilters[filterId];
+            return {
+                filters: {
+                    ...state.filters,
+                    [pluginId]: pluginFilters,
+                },
+            };
+        }),
     clearFilters: (pluginId) =>
         set((state) => {
             const copy = { ...state.filters };

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { Viewer as CesiumViewer } from "cesium";
 import type { GeoEntity, CesiumEntityOptions } from "@/core/plugins/PluginTypes";
 import { renderEntitiesChunked, renderEntities, AnimatableItem } from "../EntityRenderer";
@@ -19,6 +19,30 @@ export function useEntityRendering(
         maxScreenSpaceError: number;
     }
 ) {
+    const updateLoopRef = useRef<(() => void) | null>(null);
+    const isAnimationLoopRegisteredRef = useRef(false);
+
+    // Initialize animation loop once and keep it running
+    useEffect(() => {
+        if (!viewer || !isReady || viewer.isDestroyed()) return;
+
+        // Only register the animation loop once
+        if (!isAnimationLoopRegisteredRef.current) {
+            updateLoopRef.current = createUpdateLoop(viewer, animatablesMapRef, hoveredEntityIdRef);
+            viewer.scene.preUpdate.addEventListener(updateLoopRef.current);
+            isAnimationLoopRegisteredRef.current = true;
+        }
+
+        return () => {
+            if (updateLoopRef.current && !viewer.isDestroyed() && isAnimationLoopRegisteredRef.current) {
+                viewer.scene.preUpdate.removeEventListener(updateLoopRef.current);
+                isAnimationLoopRegisteredRef.current = false;
+                updateLoopRef.current = null;
+            }
+        };
+    }, [viewer, isReady, animatablesMapRef, hoveredEntityIdRef]);
+
+    // Update entities without recreating the animation loop
     useEffect(() => {
         if (!viewer || !isReady || viewer.isDestroyed()) return;
 
@@ -38,26 +62,15 @@ export function useEntityRendering(
             }
         }
 
-        let updatePositions: (() => void) | undefined;
-
         // Separate ellipse-type entities from primitive-based entities
         const primitiveEntities = visibleEntities.filter(e => e.options.type !== "ellipse");
         
         // Render ellipse entities through EllipseEntityManager (generic, not GPS-specific)
         ellipseEntityManager.update(visibleEntities);
 
-        // Use chunked rendering for primitive-based entities (points/billboards)
-        renderEntitiesChunked(viewer, primitiveEntities, animatablesMapRef.current).then(animatables => {
-            if (!viewer || viewer.isDestroyed()) return;
-            updatePositions = createUpdateLoop(viewer, animatables, hoveredEntityIdRef);
-            viewer.scene.preUpdate.addEventListener(updatePositions);
-        });
+        // Update primitive-based entities without destroying the animation loop
+        renderEntitiesChunked(viewer, primitiveEntities, animatablesMapRef.current);
 
-        return () => {
-            if (updatePositions && !viewer.isDestroyed()) {
-                viewer.scene.preUpdate.removeEventListener(updatePositions);
-            }
-        };
     }, [
         viewer,
         isReady,
@@ -68,6 +81,5 @@ export function useEntityRendering(
         sceneSettings.enableFxaa,
         sceneSettings.maxScreenSpaceError,
         animatablesMapRef,
-        hoveredEntityIdRef
     ]);
 }

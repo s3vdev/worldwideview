@@ -34,7 +34,7 @@ const scratchSurfaceNormal = new Cartesian3();
  */
 export function createUpdateLoop(
     viewer: CesiumViewer,
-    animatables: AnimatableItem[],
+    animatablesMapRef: React.MutableRefObject<Map<string, AnimatableItem>>,
     hoveredEntityIdRef: React.MutableRefObject<string | null>
 ): () => void {
     let frameCount = 0;
@@ -62,8 +62,8 @@ export function createUpdateLoop(
         // Extract camera culling volume for this frame
         cullingVolume = cam.frustum.computeCullingVolume(cam.positionWC, cam.directionWC, cam.upWC);
 
-        for (let i = 0; i < animatables.length; i++) {
-            const item = animatables[i];
+        // Iterate over the live animatables map
+        for (const [, item] of animatablesMapRef.current.entries()) {
             const { primitive, entity, posRef } = item;
             const isModel = item.options.type === "model";
             const isSelected = state.selectedEntity?.id === entity.id;
@@ -104,8 +104,12 @@ export function createUpdateLoop(
             if (primitive.show !== true) primitive.show = true;
 
             // 3. Position extrapolation
+            // For entities with speed > 0, extrapolate every frame for smooth motion
+            // For static entities (speed === 0), only update on full update frames for performance
             if (entity.timestamp && entity.speed !== undefined && entity.heading !== undefined) {
-                if (isFullUpdate || isSelected || isHovered) {
+                const needsExtrapolation = entity.speed > 0 || isSelected || isHovered || isFullUpdate;
+                
+                if (needsExtrapolation) {
                     extrapolatePosition(item, nowMs);
                     // Update model transform after extrapolation
                     if (isModel) {

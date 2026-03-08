@@ -7,6 +7,7 @@ import type {
 import { dataBus } from "@/core/data/DataBus";
 import { pollingManager } from "@/core/data/PollingManager";
 import { cacheLayer } from "@/core/data/CacheLayer";
+import { useStore } from "@/core/state/store";
 
 interface ManagedPlugin {
     plugin: WorldPlugin;
@@ -77,8 +78,17 @@ class PluginManager {
             async () => {
                 const managed = this.plugins.get(plugin.id);
                 if (!managed || !managed.enabled) return;
-                const entities = await plugin.fetch(managed.context.timeRange);
-                this.handleDataUpdate(plugin.id, entities);
+                
+                // Set loading state before fetch
+                useStore.getState().setLayerLoading(plugin.id, true);
+                
+                try {
+                    const entities = await plugin.fetch(managed.context.timeRange);
+                    this.handleDataUpdate(plugin.id, entities);
+                } finally {
+                    // Clear loading state after fetch completes
+                    useStore.getState().setLayerLoading(plugin.id, false);
+                }
             }
         );
     }
@@ -98,6 +108,9 @@ class PluginManager {
         if (cached && managed.enabled) {
             managed.entities = cached;
             dataBus.emit("dataUpdated", { pluginId, entities: cached });
+        } else {
+            // No cached data - set loading state and trigger immediate fetch
+            useStore.getState().setLayerLoading(pluginId, true);
         }
 
         pollingManager.start(pluginId);
@@ -127,9 +140,18 @@ class PluginManager {
     async fetchForPlugin(pluginId: string, timeRange: TimeRange): Promise<void> {
         const managed = this.plugins.get(pluginId);
         if (!managed || !managed.enabled) return;
-        managed.context.timeRange = timeRange;
-        const entities = await managed.plugin.fetch(timeRange);
-        this.handleDataUpdate(pluginId, entities);
+        
+        // Set loading state before fetch
+        useStore.getState().setLayerLoading(pluginId, true);
+        
+        try {
+            managed.context.timeRange = timeRange;
+            const entities = await managed.plugin.fetch(timeRange);
+            this.handleDataUpdate(pluginId, entities);
+        } finally {
+            // Clear loading state after fetch completes
+            useStore.getState().setLayerLoading(pluginId, false);
+        }
     }
 
     getPlugin(pluginId: string): ManagedPlugin | undefined {

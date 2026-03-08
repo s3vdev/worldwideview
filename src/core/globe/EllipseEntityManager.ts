@@ -2,8 +2,10 @@ import {
     Cartesian3,
     Color,
     EllipseGraphics,
+    PointGraphics,
     Entity,
     DistanceDisplayCondition,
+    ConstantPositionProperty,
 } from "cesium";
 import type { Viewer as CesiumViewer } from "cesium";
 import type { GeoEntity, CesiumEntityOptions } from "@/core/plugins/PluginTypes";
@@ -15,11 +17,13 @@ import type { GeoEntity, CesiumEntityOptions } from "@/core/plugins/PluginTypes"
  * This is a reusable, plugin-agnostic component of the rendering system.
  * 
  * Usage: Any plugin can return type: "ellipse" with radiusMeters,
- * and this manager will render it as a circular/elliptical area.
+ * and this manager will render it as a circular/elliptical area
+ * with an optional center point marker.
  */
 
 interface ManagedEllipse {
     cesiumEntity: Entity;
+    centerPointEntity: Entity | null; // Optional center point marker
     geoEntity: GeoEntity;
     options: CesiumEntityOptions;
 }
@@ -70,11 +74,17 @@ export class EllipseEntityManager {
         if (!this.viewer) return;
 
         const existing = this.ellipses.get(geoEntity.id);
-        const position = Cartesian3.fromDegrees(
+        
+        // Create Cartesian3 position from geographic coordinates
+        const cartesianPosition = Cartesian3.fromDegrees(
             geoEntity.longitude,
             geoEntity.latitude,
             geoEntity.altitude || 0
         );
+        
+        // Wrap in ConstantPositionProperty for proper Cesium Entity positioning
+        // This ensures the position is properly georeferenced and doesn't drift
+        const position = new ConstantPositionProperty(cartesianPosition);
 
         // Calculate ellipse parameters
         const radiusMeters = options.radiusMeters || 50000; // Default 50km
@@ -120,6 +130,40 @@ export class EllipseEntityManager {
                 existing.cesiumEntity.ellipse.outlineWidth = outlineWidth as any;
                 existing.cesiumEntity.ellipse.distanceDisplayCondition = distanceCondition as any;
             }
+
+            // Update center point if it should exist
+            if (options.size && options.size > 0) {
+                if (existing.centerPointEntity) {
+                    existing.centerPointEntity.position = position as any;
+                    if (existing.centerPointEntity.point) {
+                        existing.centerPointEntity.point.color = baseColor as any;
+                        existing.centerPointEntity.point.pixelSize = options.size as any;
+                        existing.centerPointEntity.point.outlineColor = Color.BLACK as any;
+                        existing.centerPointEntity.point.outlineWidth = 1 as any;
+                    }
+                } else {
+                    // Create center point if it doesn't exist yet
+                    const centerPoint = this.viewer.entities.add({
+                        id: `ellipse-center-${geoEntity.id}`,
+                        position,
+                        point: new PointGraphics({
+                            pixelSize: options.size,
+                            color: baseColor,
+                            outlineColor: Color.BLACK,
+                            outlineWidth: 1,
+                            // Do NOT disable depth test - this causes visual drift/floating
+                            // The point should behave like a normal geospatial marker
+                            distanceDisplayCondition: distanceCondition,
+                        }),
+                        _wwvEntity: geoEntity,
+                    } as any);
+                    existing.centerPointEntity = centerPoint;
+                }
+            } else if (existing.centerPointEntity) {
+                // Remove center point if size is 0 or undefined
+                this.viewer.entities.remove(existing.centerPointEntity);
+                existing.centerPointEntity = null;
+            }
         } else {
             // Create new ellipse
             const cesiumEntity = this.viewer.entities.add({
@@ -133,14 +177,34 @@ export class EllipseEntityManager {
                     outlineColor,
                     outlineWidth,
                     height: 0, // Ground-clamped
-                    distanceDisplayCondition,
+                    distanceDisplayCondition: distanceCondition,
                 }),
                 // Store reference to original GeoEntity for selection
                 _wwvEntity: geoEntity,
             } as any);
 
+            // Create optional center point marker
+            let centerPointEntity: Entity | null = null;
+            if (options.size && options.size > 0) {
+                centerPointEntity = this.viewer.entities.add({
+                    id: `ellipse-center-${geoEntity.id}`,
+                    position,
+                    point: new PointGraphics({
+                        pixelSize: options.size,
+                        color: baseColor,
+                        outlineColor: Color.BLACK,
+                        outlineWidth: 1,
+                        // Do NOT disable depth test - this causes visual drift/floating
+                        // The point should behave like a normal geospatial marker
+                        distanceDisplayCondition: distanceCondition,
+                    }),
+                    _wwvEntity: geoEntity,
+                } as any);
+            }
+
             this.ellipses.set(geoEntity.id, {
                 cesiumEntity,
+                centerPointEntity,
                 geoEntity,
                 options,
             });
@@ -154,6 +218,9 @@ export class EllipseEntityManager {
         const managed = this.ellipses.get(entityId);
         if (managed && this.viewer) {
             this.viewer.entities.remove(managed.cesiumEntity);
+            if (managed.centerPointEntity) {
+                this.viewer.entities.remove(managed.centerPointEntity);
+            }
             this.ellipses.delete(entityId);
         }
     }
@@ -165,6 +232,9 @@ export class EllipseEntityManager {
         if (this.viewer && !this.viewer.isDestroyed()) {
             this.ellipses.forEach(managed => {
                 this.viewer!.entities.remove(managed.cesiumEntity);
+                if (managed.centerPointEntity) {
+                    this.viewer!.entities.remove(managed.centerPointEntity);
+                }
             });
         }
         this.ellipses.clear();

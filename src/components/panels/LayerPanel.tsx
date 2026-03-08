@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Loader2 } from "lucide-react";
 
 import { useStore } from "@/core/state/store";
 import { pluginManager } from "@/core/plugins/PluginManager";
@@ -106,6 +107,7 @@ export function LayerPanel() {
                             </div>
                             {plugins.map((managed) => {
                                 const isEnabled = layers[managed.plugin.id]?.enabled || false;
+                                const isLoading = layers[managed.plugin.id]?.isLoading || false;
                                 const count = (entitiesByPlugin[managed.plugin.id] || []).length;
 
                                 return (
@@ -127,6 +129,11 @@ export function LayerPanel() {
                                                 {managed.plugin.description}
                                             </div>
                                         </div>
+                                        {isEnabled && isLoading && count === 0 && (
+                                            <span className="layer-item__loading">
+                                                <Loader2 size={14} className="animate-spin" style={{ color: "var(--accent-cyan)" }} />
+                                            </span>
+                                        )}
                                         {isEnabled && count > 0 && (
                                             <span className="layer-item__count">
                                                 {count.toLocaleString()}

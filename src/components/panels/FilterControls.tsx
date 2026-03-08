@@ -6,6 +6,7 @@ interface FilterControlProps {
     definition: FilterDefinition;
     value: FilterValue | undefined;
     onChange: (value: FilterValue) => void;
+    onRemove: () => void;
 }
 
 export function TextFilter({ definition, value, onChange }: FilterControlProps) {
@@ -105,27 +106,34 @@ export function RangeFilter({ definition, value, onChange }: FilterControlProps)
     );
 }
 
-export function BooleanFilter({ definition, value, onChange }: FilterControlProps) {
+export function BooleanFilter({ definition, value, onChange, onRemove }: FilterControlProps) {
     const boolVal = value?.type === "boolean" ? value.value : false;
     const isActive = value !== undefined;
+
+    const handleClick = () => {
+        if (!isActive) {
+            // All → Yes
+            onChange({ type: "boolean", value: true });
+        } else if (boolVal) {
+            // Yes → No
+            onChange({ type: "boolean", value: false });
+        } else {
+            // No → All (remove filter)
+            onRemove();
+        }
+    };
 
     return (
         <div className="filter-control filter-control--row">
             <label className="filter-control__label">{definition.label}</label>
             <button
                 className={`filter-toggle ${isActive ? (boolVal ? "filter-toggle--on" : "filter-toggle--off") : ""}`}
-                onClick={() => {
-                    if (!isActive) {
-                        onChange({ type: "boolean", value: true });
-                    } else if (boolVal) {
-                        onChange({ type: "boolean", value: false });
-                    } else {
-                        // Cycle: inactive → true → false → inactive
-                        // For "inactive", parent should clear the filter
-                        onChange({ type: "boolean", value: true });
-                    }
-                }}
-                title={isActive ? (boolVal ? "Showing only matching" : "Hiding matching") : "Click to filter"}
+                onClick={handleClick}
+                title={
+                    isActive 
+                        ? (boolVal ? "Showing only matching" : "Hiding matching") 
+                        : "Click to filter"
+                }
             >
                 {isActive ? (boolVal ? "Yes" : "No") : "All"}
             </button>

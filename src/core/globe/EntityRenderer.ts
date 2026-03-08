@@ -133,16 +133,37 @@ function renderSingleEntity(
 
     if (item) {
         // Update existing
+        const oldEntity = item.entity;
+        const oldTimestamp = oldEntity.timestamp ? 
+            (typeof oldEntity.timestamp === 'string' ? new Date(oldEntity.timestamp) : oldEntity.timestamp).getTime() : 0;
+        const newTimestamp = entity.timestamp ? 
+            (typeof entity.timestamp === 'string' ? new Date(entity.timestamp) : entity.timestamp).getTime() : 0;
+        
+        // Only reset extrapolation state if we received genuinely new position data
+        const hasNewData = newTimestamp !== oldTimestamp || 
+                          entity.latitude !== oldEntity.latitude || 
+                          entity.longitude !== oldEntity.longitude ||
+                          entity.heading !== oldEntity.heading ||
+                          entity.speed !== oldEntity.speed;
+        
         item.entity = entity;
         item.options = options;
-        item.posRef = position;
-        item.basePosition = undefined;
-        item.velocityVector = undefined;
+        
+        if (hasNewData) {
+            // New data: reset position and extrapolation state
+            item.posRef = position;
+            item.basePosition = undefined;
+            item.velocityVector = undefined;
+            if (!Cartesian3.equals(item.primitive.position, position)) {
+                item.primitive.position = position;
+            }
+        }
+        // else: keep the extrapolated position intact
+        
         item.baseColor = color;
         item.baseOutlineColor = options.outlineColor ? Color.fromCssColorString(options.outlineColor) : Color.BLACK;
 
         if (!Color.equals(item.primitive.color, color)) item.primitive.color = color;
-        if (!Cartesian3.equals(item.primitive.position, position)) item.primitive.position = position;
 
         if (options.iconUrl) {
             if (item.primitive.image !== options.iconUrl) item.primitive.image = options.iconUrl;

@@ -7,12 +7,13 @@ import { TextFilter, SelectFilter, RangeFilter, BooleanFilter } from "./FilterCo
 import { PluginIcon } from "@/components/common/PluginIcon";
 import type { FilterDefinition, FilterValue } from "@/core/plugins/PluginTypes";
 
-function FilterControl({ def, value, onChange }: {
+function FilterControl({ def, value, onChange, onRemove }: {
     def: FilterDefinition;
     value: FilterValue | undefined;
     onChange: (v: FilterValue) => void;
+    onRemove: () => void;
 }) {
-    const props = { definition: def, value, onChange };
+    const props = { definition: def, value, onChange, onRemove };
     switch (def.type) {
         case "text": return <TextFilter {...props} />;
         case "select": return <SelectFilter {...props} />;
@@ -27,6 +28,7 @@ export function FilterSection() {
     const layers = useStore((s) => s.layers);
     const filters = useStore((s) => s.filters);
     const setFilter = useStore((s) => s.setFilter);
+    const removeFilter = useStore((s) => s.removeFilter);
     const clearFilters = useStore((s) => s.clearFilters);
     const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
@@ -47,7 +49,7 @@ export function FilterSection() {
         <>
             {enabledPlugins.map((managed) => {
                 const pluginId = managed.plugin.id;
-                const defs = managed.plugin.getFilterDefinitions?.() || [];
+                const defs = managed.plugin.getFilterDefinitions!() || [];
                 const activeCount = Object.keys(filters[pluginId] || {}).length;
                 const isCollapsed = collapsed[pluginId] ?? false;
 
@@ -55,14 +57,12 @@ export function FilterSection() {
                     <div key={pluginId} className="filter-section">
                         <button
                             className="filter-section__header"
-                            onClick={() => setCollapsed((c) => ({ ...c, [pluginId]: !c[pluginId] }))}
+                            onClick={() => setCollapsed(prev => ({ ...prev, [pluginId]: !isCollapsed }))}
                         >
-                            <span className="filter-section__icon">
-                                <PluginIcon icon={managed.plugin.icon} size={14} />
-                            </span>
+                            <PluginIcon icon={managed.plugin.icon} size={14} />
                             <span className="filter-section__name">{managed.plugin.name}</span>
-                            {activeCount > 0 && <span className="filter-badge">{activeCount}</span>}
-                            <span className={`filter-section__chevron ${isCollapsed ? "" : "filter-section__chevron--open"}`}>▸</span>
+                            {activeCount > 0 && <span className="filter-section__badge">{activeCount}</span>}
+                            <span className={`filter-section__caret ${isCollapsed ? "filter-section__caret--collapsed" : ""}`}>▸</span>
                         </button>
 
                         {!isCollapsed && (
@@ -73,6 +73,7 @@ export function FilterSection() {
                                         def={def}
                                         value={filters[pluginId]?.[def.id]}
                                         onChange={(v) => setFilter(pluginId, def.id, v)}
+                                        onRemove={() => removeFilter(pluginId, def.id)}
                                     />
                                 ))}
                                 {activeCount > 0 && (

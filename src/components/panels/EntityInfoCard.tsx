@@ -3,9 +3,10 @@
 import { useStore } from "@/core/state/store";
 import { pluginManager } from "@/core/plugins/PluginManager";
 import { PluginIcon } from "@/components/common/PluginIcon";
+import { Shield } from "lucide-react";
 
 const CARD_WIDTH = 260;
-const CARD_HEIGHT_EST = 180;
+const CARD_HEIGHT_EST = 220; // Increased for military section
 const OFFSET_X = 16;
 const OFFSET_Y = 16;
 const EDGE_PADDING = 12;
@@ -28,6 +29,10 @@ export function EntityInfoCard() {
     const managed = pluginManager.getPlugin(hoveredEntity.pluginId);
     const pluginIcon = managed?.plugin.icon;
     const pluginName = managed?.plugin.name || hoveredEntity.pluginId;
+
+    // Check if military aircraft
+    const isMilitary = hoveredEntity.properties?.military === true;
+    const militaryReason = hoveredEntity.properties?.militaryDetectionReason as string | undefined;
 
     // Clamp position to keep card within viewport
     let x = screenPos.x + OFFSET_X;
@@ -77,10 +82,50 @@ export function EntityInfoCard() {
                 <div className="entity-info-card__title-group">
                     <div className="entity-info-card__title">
                         {hoveredEntity.label || hoveredEntity.id}
+                        {isMilitary && (
+                            <Shield 
+                                size={14} 
+                                style={{ 
+                                    marginLeft: "6px", 
+                                    color: "#f97316",
+                                    display: "inline-block",
+                                    verticalAlign: "middle"
+                                }} 
+                            />
+                        )}
                     </div>
                     <div className="entity-info-card__badge">{pluginName}</div>
                 </div>
             </div>
+
+            {/* Military Classification Badge */}
+            {isMilitary && militaryReason && (
+                <div style={{
+                    background: "rgba(249, 115, 22, 0.1)",
+                    border: "1px solid rgba(249, 115, 22, 0.3)",
+                    borderRadius: "4px",
+                    padding: "6px 8px",
+                    marginBottom: "8px",
+                }}>
+                    <div style={{
+                        fontSize: "9px",
+                        fontWeight: 600,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.5px",
+                        color: "#f97316",
+                        marginBottom: "2px",
+                    }}>
+                        Military Classification
+                    </div>
+                    <div style={{
+                        fontSize: "10px",
+                        color: "rgba(255, 255, 255, 0.7)",
+                        lineHeight: "1.4",
+                    }}>
+                        {militaryReason}
+                    </div>
+                </div>
+            )}
 
             {/* Properties */}
             <div className="entity-info-card__props">

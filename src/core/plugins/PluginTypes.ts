@@ -45,7 +45,7 @@ export interface LayerConfig {
 
 // ─── Cesium Entity Options ───────────────────────────────────
 export interface CesiumEntityOptions {
-    type: "billboard" | "point" | "polyline" | "polygon" | "label" | "model";
+    type: "billboard" | "point" | "polyline" | "polygon" | "label" | "model" | "ellipse";
     color?: string;
     size?: number;
     iconUrl?: string;
@@ -61,6 +61,18 @@ export interface CesiumEntityOptions {
     modelScale?: number;
     /** Minimum pixel size for the model (prevents vanishing at distance) */
     modelMinPixelSize?: number;
+    
+    // ─── Ellipse Options (for type: "ellipse") ─────────────────
+    /** Radius in meters for ellipse/circular area visualization */
+    radiusMeters?: number;
+    /** Semi-major axis in meters (if different from radiusMeters) */
+    semiMajorAxis?: number;
+    /** Semi-minor axis in meters (if different from radiusMeters) */
+    semiMinorAxis?: number;
+    /** Fill opacity (0.0 - 1.0) for area visualization */
+    fillOpacity?: number;
+    /** Whether to show outline/border */
+    showOutline?: boolean;
 }
 
 // ─── Selection Behavior ──────────────────────────────────────

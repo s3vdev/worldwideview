@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import type { Viewer as CesiumViewer } from "cesium";
 import type { GeoEntity, CesiumEntityOptions } from "@/core/plugins/PluginTypes";
 import { renderEntitiesChunked, renderEntities, AnimatableItem } from "../EntityRenderer";
+import { ellipseEntityManager } from "../EllipseEntityManager";
 import { createUpdateLoop } from "../AnimationLoop";
 
 export function useEntityRendering(
@@ -21,6 +22,9 @@ export function useEntityRendering(
     useEffect(() => {
         if (!viewer || !isReady || viewer.isDestroyed()) return;
 
+        // Initialize ellipse manager with current viewer
+        ellipseEntityManager.setViewer(viewer);
+
         // Sync scene settings
         viewer.scene.debugShowFramesPerSecond = sceneSettings.showFps;
         viewer.resolutionScale = sceneSettings.resolutionScale;
@@ -36,8 +40,14 @@ export function useEntityRendering(
 
         let updatePositions: (() => void) | undefined;
 
-        // Use chunked rendering for large updates to prevent main thread lockups
-        renderEntitiesChunked(viewer, visibleEntities, animatablesMapRef.current).then(animatables => {
+        // Separate ellipse-type entities from primitive-based entities
+        const primitiveEntities = visibleEntities.filter(e => e.options.type !== "ellipse");
+        
+        // Render ellipse entities through EllipseEntityManager (generic, not GPS-specific)
+        ellipseEntityManager.update(visibleEntities);
+
+        // Use chunked rendering for primitive-based entities (points/billboards)
+        renderEntitiesChunked(viewer, primitiveEntities, animatablesMapRef.current).then(animatables => {
             if (!viewer || viewer.isDestroyed()) return;
             updatePositions = createUpdateLoop(viewer, animatables, hoveredEntityIdRef);
             viewer.scene.preUpdate.addEventListener(updatePositions);

@@ -241,14 +241,13 @@ export class SatellitesPlugin implements WorldPlugin {
                     const satId = `satellite-${tle.name.replace(/[^a-zA-Z0-9]/g, "-")}`;
                     this.tleCache.set(satId, { satrec, tle });
                     
-                    // Calculate current position and velocity
+                    // Calculate current position from TLE
                     const positionAndVelocity = propagate(satrec, now);
                     if (!positionAndVelocity || typeof positionAndVelocity.position === "boolean") {
                         continue;
                     }
 
                     const positionEci = positionAndVelocity.position as EciVec3<number>;
-                    const velocityEci = positionAndVelocity.velocity as EciVec3<number> | false;
                     
                     // Convert ECI to geodetic coordinates
                     const gmst = gstime(now);
@@ -260,37 +259,17 @@ export class SatellitesPlugin implements WorldPlugin {
                         altitude: positionGd.height * 1000, // km to meters
                     };
 
-                    // Calculate velocity (speed and heading) from ECI velocity vector
-                    let speed: number | undefined;
-                    let heading: number | undefined;
-                    
-                    if (velocityEci && typeof velocityEci !== "boolean") {
-                        // Calculate speed magnitude (km/s -> m/s)
-                        speed = Math.sqrt(
-                            velocityEci.x * velocityEci.x + 
-                            velocityEci.y * velocityEci.y + 
-                            velocityEci.z * velocityEci.z
-                        ) * 1000; // Convert km/s to m/s
-                        
-                        // Calculate heading from velocity vector (simplified - use east/north projection)
-                        // This is approximate but sufficient for smooth interpolation
-                        const velocityNorth = -velocityEci.y; // Approximate north component
-                        const velocityEast = velocityEci.x;   // Approximate east component
-                        heading = (Math.atan2(velocityEast, velocityNorth) * 180 / Math.PI + 360) % 360;
-                    }
-
                     // Extract NORAD catalog number from line 1
                     const noradId = tle.line1.substring(2, 7).trim();
 
-                    // Create satellite marker entity with speed and heading for smooth animation
+                    // Create satellite marker entity
+                    // Orbital propagation is handled by getDynamicPosition() for smooth per-frame motion
                     entities.push({
                         id: satId,
                         pluginId: "satellites",
                         latitude: position.latitude,
                         longitude: position.longitude,
                         altitude: position.altitude,
-                        speed, // Velocity in m/s for animation
-                        heading, // Direction of movement for animation
                         timestamp: now,
                         label: tle.name.length > 20 ? tle.name.substring(0, 20) + "..." : tle.name,
                         properties: {
@@ -300,7 +279,9 @@ export class SatellitesPlugin implements WorldPlugin {
                             source: "CelesTrak",
                             altitudeKm: Math.round(position.altitude / 1000),
                             orbitalPeriod: Math.round(calculateOrbitalPeriod(satrec)),
-                            velocityKmS: speed ? (speed / 1000).toFixed(2) : undefined,
+                            // Store TLE lines for continuous orbital propagation via getDynamicPosition()
+                            tleLine1: tle.line1,
+                            tleLine2: tle.line2,
                         },
                     });
                 } catch (err) {
@@ -317,9 +298,11 @@ export class SatellitesPlugin implements WorldPlugin {
     }
 
     getPollingInterval(): number {
-        // Update satellite positions every 2 minutes
-        // Orbital mechanics are relatively slow-changing for LEO satellites
-        return 2 * 60 * 1000; // 2 minutes
+        // Update TLE data every 6 hours
+        // Satellites now use per-frame orbital propagation, so we don't need frequent polling
+        // TLE data itself doesn't change rapidly - updates every few hours are sufficient
+        // Note: API has 30-minute cache, actual TLE updates happen when cache expires
+        return 6 * 60 * 60 * 1000; // 6 hours
     }
 
     getLayerConfig(): LayerConfig {
@@ -554,5 +537,63 @@ export class SatellitesPlugin implements WorldPlugin {
             clampToGround: true,
             distanceDisplayCondition: { near: 0, far: 50_000_000 }, // Show ground track up to 50,000km
         };
+    }
+
+    /**
+     * Compute dynamic satellite position using orbital propagation.
+     * Called by AnimationLoop every frame for smooth orbital motion.
+     */
+    getDynamicPosition(entity: GeoEntity, time: Date): { latitude: number; longitude: number; altitude: number } | undefined {
+        // Extract TLE lines from entity properties
+        const tleLine1 = entity.properties.tleLine1 as string | undefined;
+        const tleLine2 = entity.properties.tleLine2 as string | undefined;
+        
+        if (!tleLine1 || !tleLine2) {
+            // No TLE data, fallback to static position
+            return undefined;
+        }
+        
+        // Try to get cached satrec from tleCache
+        let satrec = this.tleCache.get(entity.id)?.satrec;
+        
+        // If not cached, parse TLE now and cache it
+        if (!satrec) {
+            try {
+                satrec = twoline2satrec(tleLine1, tleLine2);
+                const tle: TLERecord = {
+                    name: entity.properties.name as string,
+                    line1: tleLine1,
+                    line2: tleLine2,
+                    group: entity.properties.group as string,
+                };
+                this.tleCache.set(entity.id, { satrec, tle });
+            } catch (err) {
+                console.warn(`[SatellitesPlugin] Failed to parse TLE for ${entity.id}`, err);
+                return undefined;
+            }
+        }
+        
+        // Propagate to current frame time
+        try {
+            const positionAndVelocity = propagate(satrec, time);
+            if (!positionAndVelocity || typeof positionAndVelocity.position === "boolean") {
+                return undefined;
+            }
+            
+            const positionEci = positionAndVelocity.position as EciVec3<number>;
+            
+            // Convert ECI to geodetic coordinates
+            const gmst = gstime(time);
+            const positionGd = eciToGeodetic(positionEci, gmst);
+            
+            return {
+                latitude: degreesLat(positionGd.latitude),
+                longitude: degreesLong(positionGd.longitude),
+                altitude: positionGd.height * 1000, // km to meters
+            };
+        } catch (err) {
+            // Propagation failed (satellite might be too old or corrupt TLE)
+            return undefined;
+        }
     }
 }

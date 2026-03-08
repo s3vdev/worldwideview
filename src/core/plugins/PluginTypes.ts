@@ -200,6 +200,34 @@ export interface WorldPlugin {
      */
     getSelectionDerivedEntities?(entity: GeoEntity): GeoEntity[];
 
+    /**
+     * Optional: Compute dynamic position for entities with custom physics/movement.
+     * 
+     * This is a generic mechanism for frame-by-frame position updates using
+     * plugin-specific physics or propagation models.
+     * 
+     * If this method is provided, the animation loop will call it every frame
+     * to update the entity's position instead of using linear extrapolation.
+     * 
+     * Examples:
+     * - Satellites: orbital propagation using TLE and SGP4/SDP4
+     * - Ballistic missiles: trajectory computation
+     * - Weather balloons: atmospheric model-based movement
+     * - Drones: path following with wind compensation
+     * 
+     * The core renderer remains generic and does not need to know about
+     * specific movement types or physics models.
+     * 
+     * @param entity - The entity to update
+     * @param time - Current simulation time (Date object)
+     * @returns Updated coordinates, or undefined to keep current position
+     */
+    getDynamicPosition?(entity: GeoEntity, time: Date): {
+        latitude: number;
+        longitude: number;
+        altitude?: number;
+    } | undefined;
+
     // Optional: Server-side data layer configuration
     getServerConfig?(): ServerPluginConfig;
 

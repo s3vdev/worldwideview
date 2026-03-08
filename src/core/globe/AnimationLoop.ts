@@ -12,6 +12,7 @@ import type { GeoEntity, CesiumEntityOptions } from "@/core/plugins/PluginTypes"
 import { useStore } from "@/core/state/store";
 import { getEntityColor, createLabel, removeLabel, type AnimatableItem } from "./EntityRenderer";
 import { updateModelTransform } from "./ModelManager";
+import { pluginManager } from "@/core/plugins/PluginManager";
 
 const HIGHLIGHT_COLOR_SELECTED = Color.fromCssColorString("#00fff7");
 const HIGHLIGHT_COLOR_HOVERED = Color.YELLOW;
@@ -103,10 +104,35 @@ export function createUpdateLoop(
 
             if (primitive.show !== true) primitive.show = true;
 
-            // 3. Position extrapolation
-            // For entities with speed > 0, extrapolate every frame for smooth motion
-            // For static entities (speed === 0), only update on full update frames for performance
-            if (entity.timestamp && entity.speed !== undefined && entity.heading !== undefined) {
+            // 3. Position update: plugin-specific dynamics or linear extrapolation
+            // First, try plugin's getDynamicPosition() for custom physics/movement
+            const managed = pluginManager.getPlugin(entity.pluginId);
+            let positionUpdated = false;
+            
+            if (managed?.plugin.getDynamicPosition) {
+                // Plugin provides custom movement logic (e.g., orbital propagation, ballistic trajectory)
+                try {
+                    const updatedPos = managed.plugin.getDynamicPosition(entity, new Date(nowMs));
+                    if (updatedPos) {
+                        // Convert lat/lon/alt to Cartesian3
+                        Cartesian3.fromDegrees(
+                            updatedPos.longitude,
+                            updatedPos.latitude,
+                            updatedPos.altitude || 0,
+                            Ellipsoid.WGS84,
+                            posRef
+                        );
+                        item.primitive.position = posRef;
+                        if (item.labelPrimitive) item.labelPrimitive.position = posRef;
+                        positionUpdated = true;
+                    }
+                } catch (err) {
+                    console.warn(`[AnimationLoop] getDynamicPosition failed for ${entity.id}:`, err);
+                }
+            }
+            
+            // Fallback to linear extrapolation for aircraft, ships, etc.
+            if (!positionUpdated && entity.timestamp && entity.speed !== undefined && entity.heading !== undefined) {
                 const needsExtrapolation = entity.speed > 0 || isSelected || isHovered || isFullUpdate;
                 
                 if (needsExtrapolation) {

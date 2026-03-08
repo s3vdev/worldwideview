@@ -34,6 +34,16 @@ export function EntityInfoCard() {
     const isMilitary = hoveredEntity.properties?.military === true;
     const militaryReason = hoveredEntity.properties?.militaryDetectionReason as string | undefined;
 
+    // Satellite-specific visualization semantics
+    const isSatellite = hoveredEntity.pluginId === "satellites";
+    const orbitPathShown = isSatellite && selectedEntity?.id === hoveredEntity.id;
+    const groundTrackShown = isSatellite && selectedEntity?.id === hoveredEntity.id;
+
+    // Earthquake specific semantics
+    const colorMeaning = hoveredEntity.properties?.colorMeaning as string | undefined;
+    const sizeMeaning = hoveredEntity.properties?.sizeMeaning as string | undefined;
+    const areaMeaning = hoveredEntity.properties?.areaMeaning as string | undefined;
+
     // Clamp position to keep card within viewport
     let x = screenPos.x + OFFSET_X;
     let y = screenPos.y + OFFSET_Y;
@@ -165,6 +175,28 @@ export function EntityInfoCard() {
                             {headingDisplay}
                         </span>
                     </div>
+                )}
+
+                {/* Satellite-specific semantics */}
+                {isSatellite && (
+                    <>
+                        <div className="entity-info-card__prop">
+                            <span className="entity-info-card__prop-key">Marker</span>
+                            <span className="entity-info-card__prop-value">satellite position</span>
+                        </div>
+                        {orbitPathShown && (
+                            <div className="entity-info-card__prop">
+                                <span className="entity-info-card__prop-key">Orbit Path</span>
+                                <span className="entity-info-card__prop-value">shown (3D trajectory)</span>
+                            </div>
+                        )}
+                        {groundTrackShown && (
+                            <div className="entity-info-card__prop">
+                                <span className="entity-info-card__prop-key">Ground Track</span>
+                                <span className="entity-info-card__prop-value">shown (earth projection)</span>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
 

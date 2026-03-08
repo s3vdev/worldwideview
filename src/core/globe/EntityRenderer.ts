@@ -169,6 +169,9 @@ function renderSingleEntity(
             if (item.primitive.image !== options.iconUrl) item.primitive.image = options.iconUrl;
             const rot = options.rotation ? -CesiumMath.toRadians(options.rotation) : 0;
             if (item.primitive.rotation !== rot) item.primitive.rotation = rot;
+            // Update scale based on size option
+            const newScale = options.size ? options.size / 24 : 0.5;
+            if (item.primitive.scale !== newScale) item.primitive.scale = newScale;
         } else {
             const newSize = options.size || 6;
             const newOutlineWidth = options.outlineWidth || 1;
@@ -180,8 +183,11 @@ function renderSingleEntity(
     } else {
         let addedPrimitive: any;
         if (options.iconUrl) {
+            // Calculate scale from size option (size in pixels, scale relative to icon size)
+            // Default icon size is ~24px, so scale = (desired size in px) / 24
+            const scale = options.size ? options.size / 24 : 0.5;
             addedPrimitive = billboards.add({
-                position, image: options.iconUrl, scale: 0.5,
+                position, image: options.iconUrl, scale,
                 verticalOrigin: VerticalOrigin.CENTER, horizontalOrigin: HorizontalOrigin.CENTER,
                 rotation: options.rotation ? -CesiumMath.toRadians(options.rotation) : 0,
                 color, scaleByDistance: new NearFarScalar(1e3, 1.0, 1e7, 0.3), id: clickId,
@@ -225,13 +231,21 @@ function cleanupRemovedEntities(
 ) {
     for (const [id, item] of existingMap.entries()) {
         if (!currentIds.has(id)) {
-            if (item.options.iconUrl) {
-                billboards.remove(item.primitive);
-            } else {
-                points.remove(item.primitive);
-            }
-            if (item.labelPrimitive) {
-                labels.remove(item.labelPrimitive);
+            try {
+                if (item.options.iconUrl) {
+                    if (!billboards.isDestroyed()) {
+                        billboards.remove(item.primitive);
+                    }
+                } else {
+                    if (!points.isDestroyed()) {
+                        points.remove(item.primitive);
+                    }
+                }
+                if (item.labelPrimitive && !labels.isDestroyed()) {
+                    labels.remove(item.labelPrimitive);
+                }
+            } catch (e) {
+                // Primitive may already be destroyed - ignore
             }
             existingMap.delete(id);
         }

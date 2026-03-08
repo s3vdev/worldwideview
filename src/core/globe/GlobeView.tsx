@@ -70,8 +70,21 @@ export default function GlobeView() {
                 result.push({ entity, options: managed.plugin.renderEntity(entity) });
             });
         });
+        
+        // Generic: Inject derived entities for selected entity (e.g., satellite orbits, flight paths, coverage areas)
+        if (selectedEntity) {
+            const managed = pluginManager.getPlugin(selectedEntity.pluginId);
+            if (managed && managed.plugin.getSelectionDerivedEntities) {
+                const derivedEntities = managed.plugin.getSelectionDerivedEntities(selectedEntity);
+                derivedEntities.forEach((derivedEntity) => {
+                    const options = managed.plugin.renderEntity(derivedEntity);
+                    result.push({ entity: derivedEntity, options });
+                });
+            }
+        }
+        
         return result;
-    }, [layers, entitiesByPlugin, filters]);
+    }, [layers, entitiesByPlugin, filters, selectedEntity]);
 
     // Imagery & Scene Management Hooks
     useImageryManager(viewerRef.current);

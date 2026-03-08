@@ -221,7 +221,9 @@ function applyHighlight(item: AnimatableItem, isSelected: boolean, isHovered: bo
     if (targetState === 'selected') {
         primitive.color = HIGHLIGHT_COLOR_SELECTED;
         if (options.type === "billboard") {
-            primitive.scale = 0.7;
+            // Calculate original scale from size option
+            const baseScale = options.size ? options.size / 24 : 0.5;
+            primitive.scale = baseScale * 1.4; // 40% larger when selected
         } else {
             primitive.pixelSize = (options.size || 6) * 2.0;
             primitive.outlineColor = HIGHLIGHT_COLOR_SELECTED;
@@ -230,7 +232,9 @@ function applyHighlight(item: AnimatableItem, isSelected: boolean, isHovered: bo
     } else if (targetState === 'hovered') {
         primitive.color = HIGHLIGHT_COLOR_HOVERED;
         if (options.type === "billboard") {
-            primitive.scale = 0.6;
+            // Calculate original scale from size option
+            const baseScale = options.size ? options.size / 24 : 0.5;
+            primitive.scale = baseScale * 1.2; // 20% larger when hovered
         } else {
             primitive.pixelSize = (options.size || 6) * 1.5;
             primitive.outlineColor = HIGHLIGHT_COLOR_HOVERED;
@@ -239,7 +243,9 @@ function applyHighlight(item: AnimatableItem, isSelected: boolean, isHovered: bo
     } else {
         primitive.color = item.baseColor;
         if (options.type === "billboard") {
-            primitive.scale = 0.5;
+            // Restore original scale from size option
+            const baseScale = options.size ? options.size / 24 : 0.5;
+            primitive.scale = baseScale;
         } else {
             primitive.pixelSize = options.size || 6;
             primitive.outlineColor = item.baseOutlineColor;

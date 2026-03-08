@@ -4,6 +4,52 @@
 
 As a real-time situational awareness platform, it turns raw geospatial signals—such as aircraft positions, maritime AIS, or satellite orbits—into interactive, cinematic layers on a high-fidelity 3D globe.
 
+![WorldWideView Screenshot](docs/screen.png)
+
+## Current Data Layers
+
+### Aviation
+- **Real-time aircraft tracking** via OpenSky Network
+- **Military aircraft detection** using callsign patterns and ICAO address ranges
+- **Visual distinction**: Military aircraft rendered in orange, civilian in blue/purple gradient by altitude
+- **10,000+ live aircraft** with smooth interpolation between updates
+- **Filters**: Military status, country, altitude, speed
+
+### Satellites
+- **Live orbital tracking** with TLE propagation using satellite.js
+- **Orbit path visualization** for selected satellites
+- **Ground track projection** showing earth surface path
+- **Groups**: Space stations (ISS, Tiangong), GPS, Weather, Starlink
+- **Real-time position extrapolation** for smooth orbital motion
+- ⚠️ **Note**: CelesTrak API currently blocked - requires alternative data source
+
+### Maritime
+- **Vessel tracking** with type-based color coding
+- **Dynamic sizing**: Larger icons for moving vessels
+- **Ship icon** with heading orientation
+- **Demo data** (AIS integration planned)
+
+### GPS Jamming (Demo)
+- **Elliptical coverage areas** for GPS interference zones
+- **Color-coded by severity**
+- **Demo data** for proof-of-concept
+
+### Earthquakes
+- **Live USGS earthquake data** (past 24 hours)
+- **Visual encoding**: 
+  - Marker color by USGS alert level (green/yellow/orange/red)
+  - Marker size by magnitude
+  - Ellipse area showing approximate impact radius
+- **Real-time updates** every 5 minutes
+
+### Borders & Labels
+- **Political boundaries** with country labels
+- **Toggle visibility** for decluttered views
+
+### Public Cameras
+- **Live camera feeds** from around the world
+- **Click to view stream**
+
 ## Key Philosophies
 
 - **Modular Intelligence**: Every data source is a plugin. The core engine is data-agnostic.

@@ -54,6 +54,8 @@ export interface CesiumEntityOptions {
     outlineWidth?: number;
     labelText?: string;
     labelFont?: string;
+    /** Label text color (CSS color string) */
+    labelColor?: string;
     distanceDisplayCondition?: { near: number; far: number };
     /** URL to a glTF/glb model (used when type is "model") */
     modelUrl?: string;
@@ -73,6 +75,20 @@ export interface CesiumEntityOptions {
     fillOpacity?: number;
     /** Whether to show outline/border */
     showOutline?: boolean;
+    
+    // ─── Polyline Options (for type: "polyline") ─────────────────
+    /** Array of positions for the polyline path */
+    positions?: Array<{ latitude: number; longitude: number; altitude?: number }>;
+    /** Line width in pixels (default: 2) */
+    width?: number;
+    /** Whether to clamp polyline to ground (default: false) */
+    clampToGround?: boolean;
+    /** Opacity for polyline material (0.0 - 1.0, default: 1.0) */
+    opacity?: number;
+    /** Whether to use dashed line style (default: false) */
+    dashed?: boolean;
+    /** Dash length in pixels if dashed is true (default: 16) */
+    dashLength?: number;
 }
 
 // ─── Selection Behavior ──────────────────────────────────────
@@ -163,6 +179,26 @@ export interface WorldPlugin {
 
     // Optional: Selection behavior (trails, camera offsets)
     getSelectionBehavior?(entity: GeoEntity): SelectionBehavior | null;
+
+    /**
+     * Optional: Return additional entities to render when this entity is selected.
+     * 
+     * This is a generic mechanism for selection-based derived visualization.
+     * The returned entities will be passed through renderEntity() automatically.
+     * 
+     * Examples:
+     * - Satellite orbit path and ground track for selected satellite
+     * - Flight path projection for selected aircraft
+     * - Coverage area for selected radar
+     * - Sensor cone for selected camera
+     * 
+     * The derived entities are automatically added to the visible entities
+     * and removed when selection changes.
+     * 
+     * @param entity - The selected entity
+     * @returns Array of additional GeoEntity objects to render, or empty array
+     */
+    getSelectionDerivedEntities?(entity: GeoEntity): GeoEntity[];
 
     // Optional: Server-side data layer configuration
     getServerConfig?(): ServerPluginConfig;

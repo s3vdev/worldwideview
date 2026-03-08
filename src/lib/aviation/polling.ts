@@ -59,6 +59,7 @@ export async function pollAviation() {
             data._source = "live";
 
             console.log(`[Aviation Polling] Successfully fetched ${data.states ? data.states.length : 0} states from OpenSky`);
+            
             globalState.aviationData = data;
             globalState.aviationTimestamp = now;
             updateFileCache(data, now);

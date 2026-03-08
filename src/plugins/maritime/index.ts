@@ -118,13 +118,15 @@ export class MaritimePlugin implements WorldPlugin {
 
     renderEntity(entity: GeoEntity): CesiumEntityOptions {
         const vesselType = (entity.properties.vesselType as string) || "other";
+        const speed = entity.speed || 0;
+        const isMoving = speed > 1; // Moving if speed > 1 knot
+        
         return {
-            type: "point",
+            type: "billboard",
+            iconUrl: "/ship-icon.svg",
             color: getVesselColor(vesselType),
-            size: 7,
+            size: isMoving ? 32 : 24, // Like aviation: larger when moving
             rotation: entity.heading,
-            outlineColor: "#000000",
-            outlineWidth: 1,
             labelText: entity.label || undefined,
             labelFont: "11px JetBrains Mono, monospace",
         };

@@ -17,6 +17,7 @@ import { BordersPlugin } from "@/plugins/borders";
 import { CameraPlugin } from "@/plugins/camera";
 import { GPSJammingPlugin } from "@/plugins/gps-jamming";
 import { EarthquakePlugin } from "@/plugins/earthquakes";
+import { SatellitesPlugin } from "@/plugins/satellites";
 import { useStore } from "@/core/state/store";
 import { dataBus } from "@/core/data/DataBus";
 import { PanelToggleArrows } from "@/components/layout/PanelToggleArrows";
@@ -95,6 +96,7 @@ export function AppShell() {
             pluginRegistry.register(new CameraPlugin());
             pluginRegistry.register(new GPSJammingPlugin());
             pluginRegistry.register(new EarthquakePlugin());
+            pluginRegistry.register(new SatellitesPlugin());
 
             // 2. Init PluginManager
             await pluginManager.init();

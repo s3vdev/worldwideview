@@ -322,8 +322,8 @@ export class AviationPlugin implements WorldPlugin {
                         latitude: state.latitude!,
                         longitude: state.longitude!,
                         altitude: (state.baro_altitude || 0) * 10, // Scale for visibility
-                        heading: state.true_track || undefined,
-                        speed: state.velocity || undefined,
+                        heading: state.true_track ?? undefined, // Use nullish coalescing
+                        speed: state.velocity ?? undefined,     // Use nullish coalescing
                         timestamp: new Date(
                             (state.time_position || state.last_contact) * 1000
                         ),
@@ -343,6 +343,7 @@ export class AviationPlugin implements WorldPlugin {
                         },
                     };
                 });
+            
             return entities;
         } catch (err) {
             console.error("[AviationPlugin] Fetch error:", err);
@@ -372,7 +373,7 @@ export class AviationPlugin implements WorldPlugin {
             type: "model",
             // Billboard fallback for distant aircraft (LOD)
             iconUrl: "/plane-icon.svg",
-            size: isAirborne ? 8 : 5,
+            size: isAirborne ? 32 : 24,
             // 3D model config for nearby aircraft
             modelUrl: "/airplane/scene.gltf",
             modelScale: 75,

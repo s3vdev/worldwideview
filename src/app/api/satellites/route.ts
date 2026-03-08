@@ -98,7 +98,7 @@ export async function GET() {
 
         console.log(`[Satellites API] Total TLEs fetched: ${allTLEs.length}`);
 
-        // If no data was fetched, return empty result with error
+        // If no data was fetched, return empty result with error (NO CACHING)
         if (allTLEs.length === 0) {
             console.error("[Satellites API] No satellite data available from CelesTrak");
             return NextResponse.json(
@@ -108,18 +108,26 @@ export async function GET() {
                     source: "CelesTrak",
                     groups: SATELLITE_GROUPS,
                     error: "No satellite data available from CelesTrak"
-                },
-                { status: 200 } // Still return 200 but with empty data
+                }
+                // No caching for errors
             );
         }
 
-        // Return live TLE data
-        return NextResponse.json({
-            tles: allTLEs,
-            timestamp: new Date().toISOString(),
-            source: "CelesTrak",
-            groups: SATELLITE_GROUPS,
-        });
+        // Return live TLE data WITH CACHING (30 minutes + stale-while-revalidate)
+        return NextResponse.json(
+            {
+                tles: allTLEs,
+                timestamp: new Date().toISOString(),
+                source: "CelesTrak",
+                groups: SATELLITE_GROUPS,
+            },
+            {
+                headers: {
+                    // Cache for 30 minutes, allow stale content for 5 minutes while revalidating
+                    "Cache-Control": "public, max-age=1800, stale-while-revalidate=300",
+                },
+            }
+        );
     } catch (err) {
         console.error("[Satellites API] Fetch error:", err);
         return NextResponse.json(

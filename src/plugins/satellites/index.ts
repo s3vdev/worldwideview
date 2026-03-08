@@ -121,6 +121,7 @@ function calculateOrbitalPeriod(satrec: SatRec): number {
 /**
  * Generate orbit path positions (one full orbit)
  * Returns array of positions sampling the orbit
+ * Orbit is centered around the reference time for visual stability
  */
 function generateOrbitPath(
     satrec: SatRec,
@@ -129,10 +130,15 @@ function generateOrbitPath(
 ): Array<{ latitude: number; longitude: number; altitude: number }> {
     const positions: Array<{ latitude: number; longitude: number; altitude: number }> = [];
     const periodSeconds = calculateOrbitalPeriod(satrec);
+    
+    // Center the orbit around the reference time for better visual representation
+    // Start from half a period before, end half a period after
+    const startOffset = -periodSeconds / 2;
     const stepSeconds = periodSeconds / samples;
     
     for (let i = 0; i < samples; i++) {
-        const date = new Date(startDate.getTime() + i * stepSeconds * 1000);
+        const offsetSeconds = startOffset + i * stepSeconds;
+        const date = new Date(startDate.getTime() + offsetSeconds * 1000);
         const pos = calculateSatellitePosition(satrec, date);
         if (pos) {
             positions.push(pos);
@@ -150,6 +156,7 @@ function generateOrbitPath(
 /**
  * Generate ground track positions (projected path on Earth surface)
  * Returns array of surface-level positions
+ * Ground track is centered around the reference time for visual stability
  */
 function generateGroundTrack(
     satrec: SatRec,
@@ -158,10 +165,15 @@ function generateGroundTrack(
 ): Array<{ latitude: number; longitude: number; altitude: number }> {
     const positions: Array<{ latitude: number; longitude: number; altitude: number }> = [];
     const periodSeconds = calculateOrbitalPeriod(satrec);
+    
+    // Center the ground track around the reference time
+    // Start from half a period before, end half a period after
+    const startOffset = -periodSeconds / 2;
     const stepSeconds = periodSeconds / samples;
     
     for (let i = 0; i < samples; i++) {
-        const date = new Date(startDate.getTime() + i * stepSeconds * 1000);
+        const offsetSeconds = startOffset + i * stepSeconds;
+        const date = new Date(startDate.getTime() + offsetSeconds * 1000);
         const pos = calculateSatellitePosition(satrec, date);
         if (pos) {
             positions.push({
@@ -334,6 +346,7 @@ export class SatellitesPlugin implements WorldPlugin {
         // Normal satellite marker rendering
         const group = entity.properties.group as string;
         const altitudeKm = entity.properties.altitudeKm as number;
+        const satelliteName = entity.properties.name as string; // Use full name from properties
         
         // Color based on satellite group
         const color = groupToColor(group);
@@ -342,14 +355,24 @@ export class SatellitesPlugin implements WorldPlugin {
         // LEO satellites (< 1000 km): largest, closest to earth
         // MEO satellites (1000-20000 km): medium size
         // GEO satellites (> 20000 km): smaller, very distant
-        const size = altitudeKm > 20000 ? 32 : altitudeKm > 1000 ? 36 : 40;
+        let size = altitudeKm > 20000 ? 32 : altitudeKm > 1000 ? 36 : 40;
+        
+        // ISS HIGHLIGHT: Make ISS significantly larger and more prominent
+        // Detect ISS via common naming patterns: "ISS", "ISS (ZARYA)", "ZARYA"
+        const isISS = satelliteName && (
+            satelliteName.toUpperCase().includes("ISS") || 
+            satelliteName.toUpperCase().includes("ZARYA")
+        );
+        if (isISS) {
+            size = 56; // Much larger than other satellites for visibility
+        }
         
         return {
             type: "billboard", // Use billboard for recognizable satellite icon
             iconUrl: "/satellite-icon.svg",
             color, // Tint the icon based on group
-            size, // Altitude-aware sizing (6-10px)
-            labelText: entity.label,
+            size, // Altitude-aware sizing (32-40px), ISS: 56px
+            labelText: isISS ? "ISS" : entity.label, // Clear "ISS" label for ISS
             labelFont: "9px JetBrains Mono, monospace",
             labelColor: color, // Match label color to satellite group
             distanceDisplayCondition: { near: 10, far: 50_000_000 }, // Visible up to 50,000km
@@ -428,7 +451,10 @@ export class SatellitesPlugin implements WorldPlugin {
         const cached = this.tleCache.get(entity.id);
         if (!cached) return null;
 
-        const positions = generateOrbitPath(cached.satrec, new Date());
+        // Use the satellite's current timestamp as orbit calculation basis
+        // This ensures the orbit remains stable when re-rendered
+        const referenceTime = entity.timestamp ? new Date(entity.timestamp) : new Date();
+        const positions = generateOrbitPath(cached.satrec, referenceTime);
         if (positions.length === 0) return null;
 
         return {
@@ -454,7 +480,10 @@ export class SatellitesPlugin implements WorldPlugin {
         const cached = this.tleCache.get(entity.id);
         if (!cached) return null;
 
-        const positions = generateGroundTrack(cached.satrec, new Date());
+        // Use the satellite's current timestamp as ground track calculation basis
+        // This ensures the ground track remains stable when re-rendered
+        const referenceTime = entity.timestamp ? new Date(entity.timestamp) : new Date();
+        const positions = generateGroundTrack(cached.satrec, referenceTime);
         if (positions.length === 0) return null;
 
         return {

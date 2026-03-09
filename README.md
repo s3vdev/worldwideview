@@ -21,7 +21,7 @@ As a real-time situational awareness platform, it turns raw geospatial signals�
 - **Ground track projection** showing earth surface path
 - **Groups**: Space stations (ISS, Tiangong), GPS, Weather, Starlink
 - **Real-time position extrapolation** for smooth orbital motion
-- ⚠️ **Note**: CelesTrak API currently blocked - requires alternative data source
+- ⚠️ **Note**: CelesTrak API used
 
 ### Maritime
 - **Vessel tracking** with type-based color coding

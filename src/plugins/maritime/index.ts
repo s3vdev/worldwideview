@@ -55,7 +55,7 @@ function generateDemoVessels(): GeoEntity[] {
         latitude: v.lat + (Math.random() - 0.5) * 0.1,
         longitude: v.lon + (Math.random() - 0.5) * 0.1,
         heading: v.heading,
-        speed: v.speed,
+        speed: v.speed * 0.514444, // Convert knots to m/s for AnimationLoop
         timestamp: new Date(),
         label: v.name,
         properties: {

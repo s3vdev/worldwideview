@@ -434,9 +434,9 @@ export class SatellitesPlugin implements WorldPlugin {
         const cached = this.tleCache.get(entity.id);
         if (!cached) return null;
 
-        // Use the satellite's current timestamp as orbit calculation basis
-        // This ensures the orbit remains stable when re-rendered
-        const referenceTime = entity.timestamp ? new Date(entity.timestamp) : new Date();
+        // Use CURRENT time (not entity.timestamp) to align with getDynamicPosition()
+        // This ensures the satellite marker sits ON the orbit line
+        const referenceTime = new Date();
         const positions = generateOrbitPath(cached.satrec, referenceTime);
         if (positions.length === 0) return null;
 
@@ -463,9 +463,9 @@ export class SatellitesPlugin implements WorldPlugin {
         const cached = this.tleCache.get(entity.id);
         if (!cached) return null;
 
-        // Use the satellite's current timestamp as ground track calculation basis
-        // This ensures the ground track remains stable when re-rendered
-        const referenceTime = entity.timestamp ? new Date(entity.timestamp) : new Date();
+        // Use CURRENT time (not entity.timestamp) to align with getDynamicPosition()
+        // This ensures the satellite marker sits ON the ground track line
+        const referenceTime = new Date();
         const positions = generateGroundTrack(cached.satrec, referenceTime);
         if (positions.length === 0) return null;
 

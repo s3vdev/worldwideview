@@ -228,18 +228,27 @@ export class SatellitesPlugin implements WorldPlugin {
             const groupFilter = activeFilters["group"];
             
             // Determine enabled groups from filter state
-            // If no filter is set, default to stations, gps-ops, weather (NOT starlink)
             let enabledGroups: string[];
             
-            if (groupFilter && groupFilter.type === "select") {
-                // Filter is set - fetch only the selected groups
-                enabledGroups = groupFilter.values;
+            if (groupFilter && groupFilter.type === "select" && Array.isArray(groupFilter.values) && groupFilter.values.length > 0) {
+                // Filter is set - use the selected groups (including starlink if selected)
+                enabledGroups = groupFilter.values.map((v: string) => {
+                    const normalized = String(v).toLowerCase().trim();
+                    // Map "gps" to "gps-ops" if needed
+                    if (normalized === "gps") return "gps-ops";
+                    return normalized;
+                }).filter((v: string) => v.length > 0);
             } else {
-                // No filter - fetch default groups (stations, gps-ops, weather)
-                enabledGroups = ["stations", "gps-ops", "weather"];
+                // No filter - load all default groups (stations, gps-ops, weather, starlink)
+                // This is a stable default that includes all intended satellite groups
+                // starlinkLimit will still be applied to limit Starlink satellites
+                enabledGroups = ["stations", "gps-ops", "weather", "starlink"];
             }
             
-            console.log(`[SatellitesPlugin] Enabled groups from filters: ${enabledGroups.join(", ")}`);
+            // Ensure we have at least one group
+            if (enabledGroups.length === 0) {
+                enabledGroups = ["stations", "gps-ops", "weather", "starlink"];
+            }
             
             // Build API URL with query parameters
             const params = new URLSearchParams({
@@ -247,8 +256,6 @@ export class SatellitesPlugin implements WorldPlugin {
                 starlinkLimit: settings.starlinkLimit.toString(),
             });
             const apiUrl = `/api/satellites?${params.toString()}`;
-            
-            console.log(`[SatellitesPlugin] Fetching from: ${apiUrl}`);
             
             const res = await fetch(apiUrl);
 
@@ -264,7 +271,6 @@ export class SatellitesPlugin implements WorldPlugin {
             }
             
             if (data.tles.length === 0) {
-                console.log("[SatellitesPlugin] No TLEs returned from API");
                 return [];
             }
 
@@ -275,7 +281,6 @@ export class SatellitesPlugin implements WorldPlugin {
             for (const tle of data.tles) {
                 // Check max satellites limit
                 if (entities.length >= settings.maxVisibleSatellites) {
-                    console.log(`[SatellitesPlugin] Reached max satellites limit: ${settings.maxVisibleSatellites}`);
                     break;
                 }
                 

@@ -36,15 +36,16 @@ export async function GET(request: NextRequest) {
         const groupsParam = searchParams.get("groups");
         const starlinkLimitParam = searchParams.get("starlinkLimit");
         
-        // Determine which groups to fetch (default: stations, gps-ops, weather)
+        // Determine which groups to fetch (default: stations, gps-ops, weather, starlink)
         const requestedGroups = groupsParam 
             ? groupsParam.split(",").filter(g => AVAILABLE_GROUPS.includes(g as any))
-            : ["stations", "gps-ops", "weather"]; // Default: no Starlink
+            : ["stations", "gps-ops", "weather", "starlink"]; // Default: all groups including Starlink
         
         const starlinkLimit = starlinkLimitParam ? parseInt(starlinkLimitParam, 10) : 50;
         
         console.log(`[Satellites API] Requested groups: ${requestedGroups.join(", ")}`);
         console.log(`[Satellites API] Starlink limit: ${starlinkLimit}`);
+        console.log(`[Satellites API] Groups param: ${groupsParam}`);
 
         const allTLEs: TLERecord[] = [];
 
@@ -71,6 +72,9 @@ export async function GET(request: NextRequest) {
 
                 if (!res.ok) {
                     console.error(`[Satellites API] CelesTrak returned ${res.status} for group ${group}`);
+                    if (res.status === 403) {
+                        console.error(`[Satellites API] 403 Forbidden for ${group} - CelesTrak may be blocking this request`);
+                    }
                     continue;
                 }
 
@@ -78,8 +82,15 @@ export async function GET(request: NextRequest) {
                 
                 console.log(`[Satellites API] Received ${text.length} bytes from ${group}`);
                 
+                if (text.length === 0) {
+                    console.warn(`[Satellites API] Empty response for ${group}`);
+                    continue;
+                }
+                
                 // Parse TLE format (3 lines per satellite: name, line1, line2)
                 const lines = text.trim().split("\n");
+                let parsedCount = 0;
+                let skippedCount = 0;
                 
                 for (let i = 0; i < lines.length; i += 3) {
                     if (i + 2 >= lines.length) break;
@@ -92,6 +103,7 @@ export async function GET(request: NextRequest) {
                     if (line1.startsWith("1 ") && line2.startsWith("2 ")) {
                         // Apply Starlink limit for performance
                         if (group === "starlink" && allTLEs.filter(t => t.group === "starlink").length >= starlinkLimit) {
+                            skippedCount++;
                             continue;
                         }
                         
@@ -101,10 +113,11 @@ export async function GET(request: NextRequest) {
                             line2,
                             group,
                         });
+                        parsedCount++;
                     }
                 }
                 
-                console.log(`[Satellites API] Fetched ${allTLEs.filter(t => t.group === group).length} TLEs from ${group}`);
+                console.log(`[Satellites API] ${group}: parsed ${parsedCount} TLEs${skippedCount > 0 ? `, skipped ${skippedCount} (limit reached)` : ""}`);
             } catch (err) {
                 console.error(`[Satellites API] Error fetching group ${group}:`, err);
                 // Continue with other groups even if one fails

@@ -58,6 +58,34 @@ export default function GlobeView() {
     const setCameraPosition = useStore((s) => s.setCameraPosition);
     const setFps = useStore((s) => s.setFps);
 
+    // Re-fetch when filters change (for plugins that use filters to determine what to fetch)
+    // Only trigger if filter actually changed (not on initial mount)
+    const prevSatellitesFiltersRef = useRef<string | undefined>(undefined);
+    useEffect(() => {
+        const satellitesFilters = filters["satellites"];
+        const managed = pluginManager.getPlugin("satellites");
+        
+        // Serialize current filter state for comparison
+        const currentFilterKey = satellitesFilters ? JSON.stringify(satellitesFilters) : "empty";
+        
+        // Skip on initial mount
+        if (prevSatellitesFiltersRef.current === undefined) {
+            prevSatellitesFiltersRef.current = currentFilterKey;
+            return;
+        }
+        
+        // Only trigger if filter actually changed
+        if (currentFilterKey !== prevSatellitesFiltersRef.current) {
+            if (managed && managed.enabled) {
+                pluginManager.fetchForPlugin("satellites", managed.context.timeRange).catch(err => {
+                    console.error("[GlobeView] Failed to re-fetch satellites after filter change:", err);
+                });
+            }
+            
+            prevSatellitesFiltersRef.current = currentFilterKey;
+        }
+    }, [filters["satellites"]]);
+
     // Compute visible & filtered entities
     const visibleEntities = useMemo(() => {
         const result: Array<{ entity: GeoEntity; options: CesiumEntityOptions }> = [];

@@ -65,7 +65,7 @@ export const CameraSettings: React.FC<{ pluginId: string }> = ({ pluginId }) => 
             </div>
 
             <div style={{ display: "flex", gap: "var(--space-xs)" }}>
-                {([["url", LinkIcon, "URL"], ["file", Upload, "File"], ["insecam", Globe, "Insecam"]] as const).map(
+                {([["url", LinkIcon, "URL"], ["file", Upload, "File"]] as const).map(
                     ([type, Icon, label]) => (
                         <button key={type} onClick={() => handleSourceTypeChange(type as any)} style={sourceTabStyle(settings.sourceType === type)}>
                             <Icon size={14} />

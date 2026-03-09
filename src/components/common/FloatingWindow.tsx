@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { X, Minus, Maximize2, Square } from "lucide-react";
+import { X } from "lucide-react";
 
 interface FloatingWindowProps {
     id: string;
@@ -30,44 +30,50 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
     const [size, setSize] = useState(initialSize);
     const [isDragging, setIsDragging] = useState(false);
     const [isResizing, setIsResizing] = useState(false);
-    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+    const dragStart = useRef({ x: 0, y: 0 });
+    const posRef = useRef(pos);
+    const sizeRef = useRef(size);
     const windowRef = useRef<HTMLDivElement>(null);
 
+    // Keep refs in sync for use inside event callbacks
+    useEffect(() => { posRef.current = pos; }, [pos]);
+    useEffect(() => { sizeRef.current = size; }, [size]);
+
+    // ── Mouse drag ────────────────────────────────────────────────────────────
     const handleMouseDown = (e: React.MouseEvent) => {
         if ((e.target as HTMLElement).closest(".window-controls")) return;
         setIsDragging(true);
-        setDragStart({ x: e.clientX - pos.x, y: e.clientY - pos.y });
+        dragStart.current = { x: e.clientX - pos.x, y: e.clientY - pos.y };
     };
 
     const handleResizeMouseDown = (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
         setIsResizing(true);
-        setDragStart({ x: e.clientX, y: e.clientY });
+        dragStart.current = { x: e.clientX, y: e.clientY };
     };
 
     const handleMouseMove = useCallback((e: MouseEvent) => {
         if (isDragging) {
-            const newX = e.clientX - dragStart.x;
-            const newY = e.clientY - dragStart.y;
-            setPos({ x: newX, y: newY });
+            setPos({ x: e.clientX - dragStart.current.x, y: e.clientY - dragStart.current.y });
         } else if (isResizing) {
-            const deltaX = e.clientX - dragStart.x;
-            const deltaY = e.clientY - dragStart.y;
-            const newWidth = Math.max(minWidth, size.width + deltaX);
-            const newHeight = Math.max(minHeight, size.height + deltaY);
-            setSize({ width: newWidth, height: newHeight });
-            setDragStart({ x: e.clientX, y: e.clientY });
+            const deltaX = e.clientX - dragStart.current.x;
+            const deltaY = e.clientY - dragStart.current.y;
+            setSize(prev => ({
+                width: Math.max(minWidth, prev.width + deltaX),
+                height: Math.max(minHeight, prev.height + deltaY),
+            }));
+            dragStart.current = { x: e.clientX, y: e.clientY };
         }
-    }, [isDragging, isResizing, dragStart, pos, size, minWidth, minHeight]);
+    }, [isDragging, isResizing, minWidth, minHeight]);
 
     const handleMouseUp = useCallback(() => {
         if (isDragging || isResizing) {
             setIsDragging(false);
             setIsResizing(false);
-            onUpdate?.({ position: pos, size: size });
+            onUpdate?.({ position: posRef.current, size: sizeRef.current });
         }
-    }, [isDragging, isResizing, pos, size, onUpdate]);
+    }, [isDragging, isResizing, onUpdate]);
 
     useEffect(() => {
         if (isDragging || isResizing) {
@@ -82,6 +88,60 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
             window.removeEventListener("mouseup", handleMouseUp);
         };
     }, [isDragging, isResizing, handleMouseMove, handleMouseUp]);
+
+    // ── Touch drag ────────────────────────────────────────────────────────────
+    const handleTouchStartDrag = (e: React.TouchEvent) => {
+        if ((e.target as HTMLElement).closest(".window-controls")) return;
+        const touch = e.touches[0];
+        setIsDragging(true);
+        dragStart.current = { x: touch.clientX - posRef.current.x, y: touch.clientY - posRef.current.y };
+    };
+
+    const handleTouchStartResize = (e: React.TouchEvent) => {
+        e.stopPropagation();
+        const touch = e.touches[0];
+        setIsResizing(true);
+        dragStart.current = { x: touch.clientX, y: touch.clientY };
+    };
+
+    const handleTouchMove = useCallback((e: TouchEvent) => {
+        e.preventDefault(); // prevent page scroll while dragging
+        const touch = e.touches[0];
+        if (isDragging) {
+            setPos({ x: touch.clientX - dragStart.current.x, y: touch.clientY - dragStart.current.y });
+        } else if (isResizing) {
+            const deltaX = touch.clientX - dragStart.current.x;
+            const deltaY = touch.clientY - dragStart.current.y;
+            setSize(prev => ({
+                width: Math.max(minWidth, prev.width + deltaX),
+                height: Math.max(minHeight, prev.height + deltaY),
+            }));
+            dragStart.current = { x: touch.clientX, y: touch.clientY };
+        }
+    }, [isDragging, isResizing, minWidth, minHeight]);
+
+    const handleTouchEnd = useCallback(() => {
+        if (isDragging || isResizing) {
+            setIsDragging(false);
+            setIsResizing(false);
+            onUpdate?.({ position: posRef.current, size: sizeRef.current });
+        }
+    }, [isDragging, isResizing, onUpdate]);
+
+    useEffect(() => {
+        const opts = { passive: false } as AddEventListenerOptions;
+        if (isDragging || isResizing) {
+            window.addEventListener("touchmove", handleTouchMove, opts);
+            window.addEventListener("touchend", handleTouchEnd);
+        } else {
+            window.removeEventListener("touchmove", handleTouchMove);
+            window.removeEventListener("touchend", handleTouchEnd);
+        }
+        return () => {
+            window.removeEventListener("touchmove", handleTouchMove);
+            window.removeEventListener("touchend", handleTouchEnd);
+        };
+    }, [isDragging, isResizing, handleTouchMove, handleTouchEnd]);
 
     return (
         <div
@@ -101,7 +161,8 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
                 border: "1px solid rgba(255, 255, 255, 0.15)",
                 boxShadow: "0 20px 40px rgba(0, 0, 0, 0.4)",
                 overflow: "hidden",
-                color: "white"
+                color: "white",
+                touchAction: "none", // prevent browser gestures on the window itself
             }}
         >
             {/* Header / Title Bar */}
@@ -114,9 +175,11 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
                     backgroundColor: "rgba(255, 255, 255, 0.05)",
                     borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
                     cursor: isDragging ? "grabbing" : "grab",
-                    userSelect: "none"
+                    userSelect: "none",
+                    touchAction: "none",
                 }}
                 onMouseDown={handleMouseDown}
+                onTouchStart={handleTouchStartDrag}
             >
                 <span style={{ fontSize: "12px", fontWeight: 600, color: "rgba(255, 255, 255, 0.8)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {title}
@@ -162,18 +225,20 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
                     position: "absolute",
                     bottom: 0,
                     right: 0,
-                    width: "16px",
-                    height: "16px",
+                    width: "24px",
+                    height: "24px",
                     cursor: "nwse-resize",
                     zIndex: 1001,
                     display: "flex",
                     alignItems: "flex-end",
                     justifyContent: "flex-end",
-                    padding: "2px"
+                    padding: "4px",
+                    touchAction: "none",
                 }}
                 onMouseDown={handleResizeMouseDown}
+                onTouchStart={handleTouchStartResize}
             >
-                <div style={{ width: "4px", height: "4px", backgroundColor: "rgba(255, 255, 255, 0.3)", borderRadius: "1px" }} />
+                <div style={{ width: "6px", height: "6px", backgroundColor: "rgba(255, 255, 255, 0.3)", borderRadius: "1px" }} />
             </div>
         </div>
     );

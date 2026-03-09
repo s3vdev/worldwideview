@@ -26,6 +26,15 @@ export function SearchBar() {
     }, [setIsOpen]);
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
+        const isArrow = e.key === "ArrowDown" || e.key === "ArrowUp";
+
+        // Open history dropdown when pressing arrows on empty bar
+        if (isArrow && !isOpen && !query.trim()) {
+            e.preventDefault();
+            setIsOpen(true);
+            return;
+        }
+
         if (!isOpen || flatResults.length === 0) return;
 
         if (e.key === "ArrowDown") {

@@ -20,7 +20,6 @@ import { dataBus } from "@/core/data/DataBus";
 import { PanelToggleArrows } from "@/components/layout/PanelToggleArrows";
 import { FloatingVideoManager } from "@/components/video/FloatingVideoManager";
 import { BootOverlay } from "@/components/common/BootOverlay";
-import { LocationPinOverlay } from "@/components/common/LocationPinOverlay";
 import { useBootSequence } from "@/core/hooks/useBootSequence";
 import { useIsMobile } from "@/core/hooks/useIsMobile";
 import { DataBusSubscriber } from "./DataBusSubscriber";
@@ -107,7 +106,6 @@ export function AppShell() {
             <EntityInfoCard />
             <Timeline />
             <FloatingVideoManager />
-            <LocationPinOverlay />
         </div>
     );
 }

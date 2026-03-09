@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import type { Viewer as CesiumViewer } from "cesium";
 import { Cartesian3, Ellipsoid, Math as CesiumMath, Transforms, Matrix4 } from "cesium";
 import { dataBus } from "@/core/data/DataBus";
+import { showSearchPin } from "./searchPinAnimation";
 
 export function useCameraActions(viewer: CesiumViewer | null, isReady: boolean) {
     useEffect(() => {
@@ -110,7 +111,7 @@ export function useCameraActions(viewer: CesiumViewer | null, isReady: boolean) 
                     orientation: orientation,
                     duration: 1.5,
                     complete: () => {
-                        dataBus.emit("showLocationPin", {});
+                        showSearchPin(viewer, lat, lon);
                     },
                 });
             }, 50);
@@ -122,3 +123,4 @@ export function useCameraActions(viewer: CesiumViewer | null, isReady: boolean) 
         };
     }, [viewer, isReady]);
 }
+

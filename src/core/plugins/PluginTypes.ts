@@ -183,5 +183,4 @@ export type DataBusEvents = {
     cameraFaceTowards: { lat: number; lon: number; alt: number };
     cameraGoTo: { lat: number; lon: number; alt: number; distance?: number; maxPitch?: number; heading?: number };
     globeReady: Record<string, never>;
-    showLocationPin: Record<string, never>;
 };

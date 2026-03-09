@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { MapPin, Building, LandmarkIcon, Globe } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { MapPin, Building, LandmarkIcon, Globe, Clock } from "lucide-react";
 import { useStore } from "@/core/state/store";
 import { dataBus } from "@/core/data/DataBus";
 import { pluginManager } from "@/core/plugins/PluginManager";
@@ -9,6 +9,7 @@ import type { GeoEntity } from "@/core/plugins/PluginTypes";
 import { PluginIcon } from "@/components/common/PluginIcon";
 import { buildUserKeyHeaders } from "@/lib/userApiKeys";
 import { categorizePlace, getZoomForTypes, type PlaceCategory } from "./placeCategories";
+import { useSearchHistory } from "./useSearchHistory";
 
 // ─── Types ───────────────────────────────────────────────────
 export interface SearchResult {
@@ -142,18 +143,38 @@ async function searchLocations(query: string): Promise<SearchSection | null> {
 export function useSearch() {
     const [query, setQuery] = useState("");
     const [isOpen, setIsOpen] = useState(false);
-    const [sections, setSections] = useState<SearchSection[]>([]);
+    const [liveSections, setLiveSections] = useState<SearchSection[]>([]);
     const [selectedIndex, setSelectedIndex] = useState(0);
     const layers = useStore((s) => s.layers);
     const setCameraPosition = useStore((s) => s.setCameraPosition);
     const setSelectedEntity = useStore((s) => s.setSelectedEntity);
+    const { history, addToHistory, clearHistory } = useSearchHistory();
+
+    // Build sections: history on empty query; history matches + live results when typing
+    const sections: SearchSection[] = useMemo(() => {
+        const q = query.trim().toLowerCase();
+        if (!q) {
+            if (history.length === 0) return [];
+            return [{ title: "Recent", icon: <Clock size={16} />, results: history, maxScore: 0 }];
+        }
+        const matchingHistory = history.filter(
+            (r) =>
+                r.label.toLowerCase().includes(q) ||
+                (r.subLabel && r.subLabel.toLowerCase().includes(q))
+        );
+        const recentSection: SearchSection | null =
+            matchingHistory.length > 0
+                ? { title: "Recent", icon: <Clock size={16} />, results: matchingHistory, maxScore: 99 }
+                : null;
+        return recentSection ? [recentSection, ...liveSections] : liveSections;
+    }, [query, history, liveSections]);
 
     const flatResults = sections.flatMap((s) => s.results);
 
     // Debounced search
     useEffect(() => {
         if (!query.trim()) {
-            setSections([]);
+            setLiveSections([]);
             setSelectedIndex(0);
             return;
         }
@@ -165,7 +186,7 @@ export function useSearch() {
             if (isStale) return;
             if (locationSection) newSections.push(locationSection);
             newSections.sort((a, b) => b.maxScore - a.maxScore);
-            setSections(newSections);
+            setLiveSections(newSections);
             setSelectedIndex(0);
         };
 
@@ -175,6 +196,7 @@ export function useSearch() {
 
     // Selection handler
     const handleSelect = async (result: SearchResult) => {
+        addToHistory(result);
         setIsOpen(false);
         setQuery("");
         if (result.type === "entity" && result.entity) {
@@ -214,6 +236,6 @@ export function useSearch() {
     return {
         query, setQuery, isOpen, setIsOpen,
         sections, selectedIndex, setSelectedIndex,
-        flatResults, handleSelect,
+        flatResults, handleSelect, clearHistory,
     };
 }

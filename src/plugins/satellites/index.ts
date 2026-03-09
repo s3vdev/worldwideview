@@ -19,6 +19,8 @@ import type {
     ServerPluginConfig,
     FilterDefinition,
 } from "@/core/plugins/PluginTypes";
+import { SatelliteSettings } from "./SatelliteSettings";
+import { useStore } from "@/core/state/store";
 
 /**
  * Satellites Plugin - Real-time orbital tracking
@@ -51,7 +53,9 @@ interface SatelliteAPIResponse {
     tles: TLERecord[];
     timestamp: string;
     source: string;
-    groups: string[];
+    requestedGroups?: string[];
+    starlinkLimit?: number;
+    error?: string;
 }
 
 /**
@@ -211,7 +215,42 @@ export class SatellitesPlugin implements WorldPlugin {
 
     async fetch(_timeRange: TimeRange): Promise<GeoEntity[]> {
         try {
-            const res = await fetch("/api/satellites");
+            // Get settings
+            const settingsRaw = useStore.getState().dataConfig.pluginSettings[this.id];
+            const settings = {
+                starlinkLimit: 50,
+                maxVisibleSatellites: 500,
+                ...(settingsRaw || {}),
+            };
+            
+            // Get active filters to determine which groups to fetch
+            const activeFilters = useStore.getState().filters[this.id] || {};
+            const groupFilter = activeFilters["group"];
+            
+            // Determine enabled groups from filter state
+            // If no filter is set, default to stations, gps-ops, weather (NOT starlink)
+            let enabledGroups: string[];
+            
+            if (groupFilter && groupFilter.type === "select") {
+                // Filter is set - fetch only the selected groups
+                enabledGroups = groupFilter.values;
+            } else {
+                // No filter - fetch default groups (stations, gps-ops, weather)
+                enabledGroups = ["stations", "gps-ops", "weather"];
+            }
+            
+            console.log(`[SatellitesPlugin] Enabled groups from filters: ${enabledGroups.join(", ")}`);
+            
+            // Build API URL with query parameters
+            const params = new URLSearchParams({
+                groups: enabledGroups.join(","),
+                starlinkLimit: settings.starlinkLimit.toString(),
+            });
+            const apiUrl = `/api/satellites?${params.toString()}`;
+            
+            console.log(`[SatellitesPlugin] Fetching from: ${apiUrl}`);
+            
+            const res = await fetch(apiUrl);
 
             if (!res.ok) {
                 console.error(`[SatellitesPlugin] API returned ${res.status}: ${res.statusText}`);
@@ -225,6 +264,7 @@ export class SatellitesPlugin implements WorldPlugin {
             }
             
             if (data.tles.length === 0) {
+                console.log("[SatellitesPlugin] No TLEs returned from API");
                 return [];
             }
 
@@ -233,6 +273,12 @@ export class SatellitesPlugin implements WorldPlugin {
 
             // Process each TLE
             for (const tle of data.tles) {
+                // Check max satellites limit
+                if (entities.length >= settings.maxVisibleSatellites) {
+                    console.log(`[SatellitesPlugin] Reached max satellites limit: ${settings.maxVisibleSatellites}`);
+                    break;
+                }
+                
                 try {
                     // Parse TLE
                     const satrec = twoline2satrec(tle.line1, tle.line2);
@@ -298,20 +344,29 @@ export class SatellitesPlugin implements WorldPlugin {
     }
 
     getPollingInterval(): number {
-        // Update TLE data every 6 hours
-        // Satellites now use per-frame orbital propagation, so we don't need frequent polling
-        // TLE data itself doesn't change rapidly - updates every few hours are sufficient
-        // Note: API has 30-minute cache, actual TLE updates happen when cache expires
-        return 6 * 60 * 60 * 1000; // 6 hours
+        // Get settings or use default
+        const settingsRaw = useStore.getState().dataConfig.pluginSettings[this.id];
+        const pollingInterval = settingsRaw?.pollingInterval;
+        
+        // Default: 6 hours (TLE data doesn't change rapidly)
+        return pollingInterval || (6 * 60 * 60 * 1000);
     }
 
     getLayerConfig(): LayerConfig {
+        // Get settings or use defaults
+        const settingsRaw = useStore.getState().dataConfig.pluginSettings[this.id];
+        const maxEntities = settingsRaw?.maxVisibleSatellites || 500;
+        
         return {
             color: "#22d3ee", // Default cyan for satellites
             clusterEnabled: false, // Don't cluster satellites (they're globally distributed)
             clusterDistance: 0,
-            maxEntities: 2000, // Allow up to 2000 satellites
+            maxEntities, // Configurable via settings
         };
+    }
+
+    getSettingsComponent() {
+        return SatelliteSettings;
     }
 
     renderEntity(entity: GeoEntity): CesiumEntityOptions {
@@ -331,6 +386,11 @@ export class SatellitesPlugin implements WorldPlugin {
         const altitudeKm = entity.properties.altitudeKm as number;
         const satelliteName = entity.properties.name as string; // Use full name from properties
         
+        // Get settings
+        const settingsRaw = useStore.getState().dataConfig.pluginSettings[this.id];
+        const showLabels = settingsRaw?.showLabels !== undefined ? settingsRaw.showLabels : false;
+        const highlightISS = settingsRaw?.highlightISS !== undefined ? settingsRaw.highlightISS : true;
+        
         // Color based on satellite group
         const color = groupToColor(group);
         
@@ -340,14 +400,22 @@ export class SatellitesPlugin implements WorldPlugin {
         // GEO satellites (> 20000 km): smaller, very distant
         let size = altitudeKm > 20000 ? 32 : altitudeKm > 1000 ? 36 : 40;
         
-        // ISS HIGHLIGHT: Make ISS significantly larger and more prominent
+        // ISS HIGHLIGHT: Make ISS significantly larger and more prominent (if enabled)
         // Detect ISS via common naming patterns: "ISS", "ISS (ZARYA)", "ZARYA"
         const isISS = satelliteName && (
             satelliteName.toUpperCase().includes("ISS") || 
             satelliteName.toUpperCase().includes("ZARYA")
         );
-        if (isISS) {
+        if (isISS && highlightISS) {
             size = 56; // Much larger than other satellites for visibility
+        }
+        
+        // Label text: ISS gets special label, others only if showLabels is enabled
+        let labelText: string | undefined;
+        if (isISS && highlightISS) {
+            labelText = "ISS";
+        } else if (showLabels) {
+            labelText = entity.label;
         }
         
         return {
@@ -355,7 +423,7 @@ export class SatellitesPlugin implements WorldPlugin {
             iconUrl: "/satellite-icon.svg",
             color, // Tint the icon based on group
             size, // Altitude-aware sizing (32-40px), ISS: 56px
-            labelText: isISS ? "ISS" : entity.label, // Clear "ISS" label for ISS
+            labelText,
             labelFont: "9px JetBrains Mono, monospace",
             labelColor: color, // Match label color to satellite group
             distanceDisplayCondition: { near: 10, far: 50_000_000 }, // Visible up to 50,000km
@@ -375,18 +443,27 @@ export class SatellitesPlugin implements WorldPlugin {
      * Returns orbit path and ground track entities that will be rendered via renderEntity().
      */
     getSelectionDerivedEntities(entity: GeoEntity): GeoEntity[] {
+        // Get settings
+        const settingsRaw = useStore.getState().dataConfig.pluginSettings[this.id];
+        const showOrbit = settingsRaw?.showOrbitForSelected !== undefined ? settingsRaw.showOrbitForSelected : true;
+        const showGroundTrack = settingsRaw?.showGroundTrackForSelected !== undefined ? settingsRaw.showGroundTrackForSelected : true;
+        
         const derived: GeoEntity[] = [];
         
-        // Generate orbit path entity
-        const orbitEntity = this.createOrbitPathEntity(entity);
-        if (orbitEntity) {
-            derived.push(orbitEntity);
+        // Generate orbit path entity (if enabled)
+        if (showOrbit) {
+            const orbitEntity = this.createOrbitPathEntity(entity);
+            if (orbitEntity) {
+                derived.push(orbitEntity);
+            }
         }
         
-        // Generate ground track entity
-        const groundTrackEntity = this.createGroundTrackEntity(entity);
-        if (groundTrackEntity) {
-            derived.push(groundTrackEntity);
+        // Generate ground track entity (if enabled)
+        if (showGroundTrack) {
+            const groundTrackEntity = this.createGroundTrackEntity(entity);
+            if (groundTrackEntity) {
+                derived.push(groundTrackEntity);
+            }
         }
         
         return derived;
@@ -437,7 +514,12 @@ export class SatellitesPlugin implements WorldPlugin {
         // Use CURRENT time (not entity.timestamp) to align with getDynamicPosition()
         // This ensures the satellite marker sits ON the orbit line
         const referenceTime = new Date();
-        const positions = generateOrbitPath(cached.satrec, referenceTime);
+        
+        // Get orbit sample count from settings
+        const settingsRaw = useStore.getState().dataConfig.pluginSettings[this.id];
+        const samples = settingsRaw?.orbitSampleCount || 90;
+        
+        const positions = generateOrbitPath(cached.satrec, referenceTime, samples);
         if (positions.length === 0) return null;
 
         return {
@@ -466,7 +548,12 @@ export class SatellitesPlugin implements WorldPlugin {
         // Use CURRENT time (not entity.timestamp) to align with getDynamicPosition()
         // This ensures the satellite marker sits ON the ground track line
         const referenceTime = new Date();
-        const positions = generateGroundTrack(cached.satrec, referenceTime);
+        
+        // Get orbit sample count from settings
+        const settingsRaw = useStore.getState().dataConfig.pluginSettings[this.id];
+        const samples = settingsRaw?.orbitSampleCount || 90;
+        
+        const positions = generateGroundTrack(cached.satrec, referenceTime, samples);
         if (positions.length === 0) return null;
 
         return {

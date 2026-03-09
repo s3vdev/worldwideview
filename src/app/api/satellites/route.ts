@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 
 /**
  * Satellites API Route
@@ -7,20 +8,19 @@ import { NextResponse } from "next/server";
  * 
  * Data Source: https://celestrak.org/
  * NO DEMO DATA - Real orbital data only
+ * 
+ * Query Parameters:
+ *   - groups: comma-separated list of satellite groups (e.g., "stations,gps-ops,weather")
+ *   - starlinkLimit: max number of Starlink satellites (default: 50)
  */
 
 // CelesTrak GP (General Perturbations) endpoint
 const CELESTRAK_BASE_URL = "https://celestrak.org/NORAD/elements/gp.php";
 
 /**
- * Satellite groups to fetch from CelesTrak
+ * Available satellite groups from CelesTrak
  */
-const SATELLITE_GROUPS = [
-    "stations",   // Space stations (ISS, Tiangong, etc.)
-    "gps-ops",    // GPS operational satellites
-    "weather",    // Weather satellites (NOAA, Metop, etc.)
-    "starlink",   // Starlink constellation (limited to 50)
-] as const;
+const AVAILABLE_GROUPS = ["stations", "gps-ops", "weather", "starlink"] as const;
 
 export interface TLERecord {
     name: string;
@@ -29,12 +29,27 @@ export interface TLERecord {
     group: string;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
     try {
+        // Parse query parameters
+        const { searchParams } = new URL(request.url);
+        const groupsParam = searchParams.get("groups");
+        const starlinkLimitParam = searchParams.get("starlinkLimit");
+        
+        // Determine which groups to fetch (default: stations, gps-ops, weather)
+        const requestedGroups = groupsParam 
+            ? groupsParam.split(",").filter(g => AVAILABLE_GROUPS.includes(g as any))
+            : ["stations", "gps-ops", "weather"]; // Default: no Starlink
+        
+        const starlinkLimit = starlinkLimitParam ? parseInt(starlinkLimitParam, 10) : 50;
+        
+        console.log(`[Satellites API] Requested groups: ${requestedGroups.join(", ")}`);
+        console.log(`[Satellites API] Starlink limit: ${starlinkLimit}`);
+
         const allTLEs: TLERecord[] = [];
 
-        // Fetch TLEs for each group from CelesTrak
-        for (const group of SATELLITE_GROUPS) {
+        // Fetch TLEs for each requested group from CelesTrak
+        for (const group of requestedGroups) {
             try {
                 const url = `${CELESTRAK_BASE_URL}?GROUP=${group}&FORMAT=tle`;
                 
@@ -75,8 +90,8 @@ export async function GET() {
                     
                     // Validate TLE format (line1 starts with "1 ", line2 starts with "2 ")
                     if (line1.startsWith("1 ") && line2.startsWith("2 ")) {
-                        // Limit Starlink to 50 satellites for performance
-                        if (group === "starlink" && allTLEs.filter(t => t.group === "starlink").length >= 50) {
+                        // Apply Starlink limit for performance
+                        if (group === "starlink" && allTLEs.filter(t => t.group === "starlink").length >= starlinkLimit) {
                             continue;
                         }
                         
@@ -106,7 +121,8 @@ export async function GET() {
                     tles: [],
                     timestamp: new Date().toISOString(),
                     source: "CelesTrak",
-                    groups: SATELLITE_GROUPS,
+                    requestedGroups,
+                    starlinkLimit,
                     error: "No satellite data available from CelesTrak"
                 }
                 // No caching for errors
@@ -119,7 +135,8 @@ export async function GET() {
                 tles: allTLEs,
                 timestamp: new Date().toISOString(),
                 source: "CelesTrak",
-                groups: SATELLITE_GROUPS,
+                requestedGroups,
+                starlinkLimit,
             },
             {
                 headers: {

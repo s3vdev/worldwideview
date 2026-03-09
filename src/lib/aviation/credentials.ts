@@ -59,7 +59,11 @@ export function initCredentialPool(): void {
     pool._openskyPool = creds;
     pool._openskyActiveIdx = 0;
 
-    console.log(`[Credentials] Initialised pool with ${creds.length} credential(s)`);
+    const ids = creds.map((c) => c.clientId).join(", ");
+    console.log(`[Credentials] Initialised pool with ${creds.length} credential(s): ${ids || "(none)"}`);
+    if (creds.length > 0) {
+        console.log(`[Credentials] Active credential: ${creds[0].clientId}`);
+    }
 }
 
 /** Return the active credential, or null if all are exhausted / empty. */
@@ -75,12 +79,12 @@ export function getActiveCredential(): OpenSkyCredential | null {
     for (let i = 0; i < creds.length; i++) {
         if (!creds[i].exhausted) {
             pool._openskyActiveIdx = i;
-            console.log(`[Credentials] Switched to credential ${i + 1}/${creds.length}`);
+            console.log(`[Credentials] Rotated → now using credential ${i + 1}/${creds.length}: ${creds[i].clientId}`);
             return creds[i];
         }
     }
 
-    console.warn("[Credentials] All credentials exhausted");
+    console.warn(`[Credentials] All ${creds.length} credentials exhausted — falling back to Supabase`);
     return null;
 }
 
@@ -92,7 +96,7 @@ export function rotateCredential(): void {
     const current = creds[pool._openskyActiveIdx];
     if (current) {
         current.exhausted = true;
-        console.log(`[Credentials] Credential ${pool._openskyActiveIdx + 1}/${creds.length} marked exhausted`);
+        console.log(`[Credentials] Credential ${pool._openskyActiveIdx + 1}/${creds.length} exhausted: ${current.clientId}`);
     }
 
     // getActiveCredential will find the next non-exhausted one
@@ -107,7 +111,7 @@ export function updateCredentialCredits(remaining: number): void {
     cred.creditsRemaining = remaining;
 
     if (remaining <= ROTATION_THRESHOLD) {
-        console.log(`[Credentials] Credits low (${remaining}), rotating...`);
+        console.log(`[Credentials] Credits low (${remaining}) on ${cred.clientId}, rotating...`);
         rotateCredential();
     }
 }

@@ -61,6 +61,8 @@ export interface CesiumEntityOptions {
     modelScale?: number;
     /** Minimum pixel size for the model (prevents vanishing at distance) */
     modelMinPixelSize?: number;
+    /** Heading offset in degrees to correct model orientation (e.g. 180 to flip a backward model) */
+    modelHeadingOffset?: number;
 }
 
 // ─── Selection Behavior ──────────────────────────────────────

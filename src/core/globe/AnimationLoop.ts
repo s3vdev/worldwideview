@@ -31,10 +31,11 @@ const scratchSurfaceNormal = new Cartesian3();
 /**
  * Creates the per-frame update function for entity position extrapolation,
  * horizon culling, frustum culling, and highlight styling.
+ * Accepts a getter so the loop always sees the latest animatables (live during chunked loading).
  */
 export function createUpdateLoop(
     viewer: CesiumViewer,
-    animatables: AnimatableItem[],
+    getAnimatables: () => AnimatableItem[],
     hoveredEntityIdRef: React.MutableRefObject<string | null>
 ): () => void {
     let frameCount = 0;
@@ -44,6 +45,8 @@ export function createUpdateLoop(
 
     return () => {
         if (!viewer || viewer.isDestroyed()) return;
+
+        const animatables = getAnimatables();
 
         // Lazy fetch of labels collection just once per frame
         const labelsCollection = (viewer as any)._wwvLabels;
@@ -69,8 +72,8 @@ export function createUpdateLoop(
             const isSelected = state.selectedEntity?.id === entity.id;
             const isHovered = hoveredEntityIdRef.current === entity.id;
 
-            // Skip if model hasn't loaded yet
-            if (!primitive) continue;
+            // Skip if model hasn't loaded yet or primitive was destroyed
+            if (!primitive || primitive.isDestroyed?.()) continue;
 
             // 1. Frustum Culling
             scratchSphere.center = posRef;
@@ -80,7 +83,7 @@ export function createUpdateLoop(
 
             if (!inFrustum && !isSelected && !isHovered) {
                 if (primitive.show !== false) primitive.show = false;
-                if (item.labelPrimitive && item.labelPrimitive.show !== false) item.labelPrimitive.show = false;
+                if (item.labelPrimitive && !item.labelPrimitive.isDestroyed?.() && item.labelPrimitive.show !== false) item.labelPrimitive.show = false;
                 continue;
             }
 
@@ -92,18 +95,13 @@ export function createUpdateLoop(
 
             if (!isVisible && !isSelected && !isHovered) {
                 if (primitive.show !== false) primitive.show = false;
-                if (item.labelPrimitive && item.labelPrimitive.show !== false) item.labelPrimitive.show = false;
+                if (item.labelPrimitive && !item.labelPrimitive.isDestroyed?.() && item.labelPrimitive.show !== false) item.labelPrimitive.show = false;
                 // If the entity is far away and not selected, we can destroy its label to save memory
-                if (item.labelPrimitive && labelsCollection) removeLabel(item, labelsCollection);
+                if (item.labelPrimitive && !item.labelPrimitive.isDestroyed?.() && labelsCollection) removeLabel(item, labelsCollection);
                 continue;
             }
 
-            // Don't show billboard if LOD hook has promoted this item to a 3D model
-            if (item._modelPromoted) continue;
-
-            if (primitive.show !== true) primitive.show = true;
-
-            // 3. Position extrapolation
+            // 3. Position extrapolation (runs for ALL entity types, including promoted 3D models)
             if (entity.timestamp && entity.speed !== undefined && entity.heading !== undefined) {
                 if (isFullUpdate || isSelected || isHovered) {
                     extrapolatePosition(item, nowMs);
@@ -113,6 +111,11 @@ export function createUpdateLoop(
                     }
                 }
             }
+
+            // Don't show billboard if LOD hook has promoted this item to a 3D model
+            if (item._modelPromoted) continue;
+
+            if (primitive.show !== true) primitive.show = true;
 
             // 4. Highlight styling (skip for models — they use silhouette instead)
             if (!isModel) {
@@ -136,7 +139,7 @@ export function createUpdateLoop(
                     // Create if missing and should be shown
                     createLabel(item, labelsCollection);
                 }
-                if (item.labelPrimitive) {
+                if (item.labelPrimitive && !item.labelPrimitive.isDestroyed?.()) {
                     if (item.labelPrimitive.show !== true) item.labelPrimitive.show = true;
                     const targetFillColor = isSelected ? HIGHLIGHT_COLOR_SELECTED : Color.WHITE;
                     if (!Color.equals(item.labelPrimitive.fillColor, targetFillColor)) {
@@ -144,7 +147,7 @@ export function createUpdateLoop(
                     }
                 }
             } else {
-                if (item.labelPrimitive) {
+                if (item.labelPrimitive && !item.labelPrimitive.isDestroyed?.()) {
                     if (item.labelPrimitive.show !== false) item.labelPrimitive.show = false;
                     // Proactively clean up hidden labels to save memory, they will be recreated if camera zooms back in
                     if (labelsCollection) removeLabel(item, labelsCollection);
@@ -188,9 +191,9 @@ function extrapolatePosition(item: AnimatableItem, nowMs: number): void {
 
     // If static, only set position once
     if (entity.speed === 0) {
-        if (item.primitive.position !== posRef) {
+        if (item.primitive && !item.primitive.isDestroyed?.() && item.primitive.position !== posRef) {
             item.primitive.position = posRef;
-            if (item.labelPrimitive) item.labelPrimitive.position = posRef;
+            if (item.labelPrimitive && !item.labelPrimitive.isDestroyed?.()) item.labelPrimitive.position = posRef;
         }
         return;
     }
@@ -199,8 +202,8 @@ function extrapolatePosition(item: AnimatableItem, nowMs: number): void {
     Cartesian3.multiplyByScalar(item.velocityVector, dtSec, scratchDisplacement);
     Cartesian3.add(item.basePosition!, scratchDisplacement, posRef);
 
-    item.primitive.position = posRef;
-    if (item.labelPrimitive) item.labelPrimitive.position = posRef;
+    if (item.primitive && !item.primitive.isDestroyed?.()) item.primitive.position = posRef;
+    if (item.labelPrimitive && !item.labelPrimitive.isDestroyed?.()) item.labelPrimitive.position = posRef;
 }
 
 /** Apply selected/hovered/normal highlight styling. */

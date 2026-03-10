@@ -71,10 +71,15 @@ export async function GET(request: Request) {
         if (cacheTtlMs > 0) set(CACHE_KEY_EARTHQUAKES, body, cacheTtlMs);
         return NextResponse.json(body);
     } catch (err) {
-        console.error("[Earthquake API] Fetch error:", err);
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        console.error("[Earthquake API] Fetch error:", msg);
+        const stale = cacheTtlMs > 0 ? get<{ type: string; metadata?: unknown; features: unknown[] }>(CACHE_KEY_EARTHQUAKES) : null;
+        if (stale && Array.isArray(stale.features)) {
+            return NextResponse.json({ ...stale, _degraded: true, error: msg });
+        }
         return NextResponse.json(
-            { error: err instanceof Error ? err.message : "Unknown error", features: [] },
-            { status: 500 }
+            { type: "FeatureCollection", metadata: {}, features: [], _degraded: true, error: msg },
+            { status: 200 }
         );
     }
 }

@@ -124,7 +124,12 @@ export async function GET(request: Request) {
         if (cacheTtlMs > 0) set(cacheKey, data, cacheTtlMs);
         return NextResponse.json(data);
     } catch (err) {
-        console.error("[API/wildfire] Error:", err);
-        return NextResponse.json({ fires: [] });
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("[API/wildfire] Error:", msg);
+        const stale = cacheTtlMs > 0 ? get<{ fires: unknown[]; totalCount?: number }>(cacheKey) : null;
+        if (stale && Array.isArray(stale.fires)) {
+            return NextResponse.json({ ...stale, _degraded: true, error: msg });
+        }
+        return NextResponse.json({ fires: [], totalCount: 0, _degraded: true, error: msg }, { status: 200 });
     }
 }

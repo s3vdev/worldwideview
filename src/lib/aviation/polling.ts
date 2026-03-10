@@ -2,6 +2,8 @@ import { globalState, POLL_INTERVAL } from "./state";
 import { getOpenSkyAccessToken } from "./auth";
 import { getLatestFromSupabase, recordToSupabase } from "./supabase";
 import { updateFileCache } from "./cache";
+import { set } from "@/lib/serverCache";
+import { CACHE_KEY_AVIATION, LAST_GOOD_KEY_AVIATION, STALE_MAX_AGE_MS, AVIATION_CACHE_TTL_MS } from "./cacheKeys";
 
 export async function pollAviation() {
     if (globalState.isFetching) return;
@@ -31,6 +33,7 @@ export async function pollAviation() {
         });
 
         if (!res.ok) {
+            globalState.openskyLastStatus = res.status;
             // Invalidate token so next poll uses a fresh one (rotate immediately on any API failure)
             globalState.accessToken = null;
             globalState.tokenExpiry = 0;
@@ -43,15 +46,16 @@ export async function pollAviation() {
             console.warn(`[Aviation Polling] OpenSky returned ${res.status}: ${res.statusText}${retryInfo} (Backing off to ${globalState.currentBackoff / 1000}s)`);
 
             // If rate limited and we have NO cache, try fallback.
-            // We'll update the cache with fallback data if needed.
             if (res.status === 429 && !globalState.aviationData) {
-                console.log("[Aviation Polling] Rate limited by OpenSky and no cache. Attempting fallback to Supabase history...");
-                const fallbackData = await getLatestFromSupabase();
-                if (fallbackData) {
-                    console.log(`[Aviation Polling] Fallback successful. Cached ${fallbackData.states.length} historical states.`);
+                console.log("[Aviation Polling] Rate limited and no cache. Attempting fallback to Supabase history...");
+                const { data: fallbackData } = await getLatestFromSupabase();
+                if (fallbackData && Array.isArray(fallbackData.states) && fallbackData.states.length > 0) {
+                    console.log(`[Aviation Polling] Fallback successful. Cached ${fallbackData.states.length} states. Writing to serverCache keys: ${CACHE_KEY_AVIATION}, ${LAST_GOOD_KEY_AVIATION}`);
                     globalState.aviationData = fallbackData;
                     globalState.aviationTimestamp = now;
                     updateFileCache(fallbackData, now);
+                    set(CACHE_KEY_AVIATION, fallbackData, AVIATION_CACHE_TTL_MS);
+                    set(LAST_GOOD_KEY_AVIATION, fallbackData, STALE_MAX_AGE_MS);
                 }
             }
         } else {
@@ -89,11 +93,13 @@ export async function pollAviation() {
 
         // On unexpected error, try fallback if we have no cache
         if (!globalState.aviationData) {
-            const fallbackData = await getLatestFromSupabase();
-            if (fallbackData) {
+            const { data: fallbackData } = await getLatestFromSupabase();
+            if (fallbackData && Array.isArray(fallbackData.states) && fallbackData.states.length > 0) {
                 globalState.aviationData = fallbackData;
                 globalState.aviationTimestamp = Date.now();
                 updateFileCache(fallbackData, globalState.aviationTimestamp);
+                set(CACHE_KEY_AVIATION, fallbackData, AVIATION_CACHE_TTL_MS);
+                set(LAST_GOOD_KEY_AVIATION, fallbackData, STALE_MAX_AGE_MS);
             }
         }
     } finally {

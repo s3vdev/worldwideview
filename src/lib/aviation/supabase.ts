@@ -1,12 +1,40 @@
 import { createClient } from "@supabase/supabase-js";
 
-export async function getLatestFromSupabase() {
+export interface SupabaseFallbackDebug {
+    supabaseConfigured: boolean;
+    supabaseAttempted: boolean;
+    supabaseReturnedRows: number;
+    supabaseError: string | null;
+}
+
+export interface SupabaseFallbackResult {
+    data: {
+        states: unknown[][];
+        time: number;
+        _source: string;
+        _isFallback: boolean;
+    } | null;
+    debug: SupabaseFallbackDebug;
+}
+
+export async function getLatestFromSupabase(): Promise<SupabaseFallbackResult> {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const configured = !!(supabaseUrl && supabaseServiceKey);
 
-    if (!supabaseUrl || !supabaseServiceKey) return null;
+    const debug: SupabaseFallbackDebug = {
+        supabaseConfigured: configured,
+        supabaseAttempted: false,
+        supabaseReturnedRows: 0,
+        supabaseError: null,
+    };
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    if (!configured) {
+        console.log("[Aviation Supabase] supabaseConfigured: false (missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY)");
+        return { data: null, debug };
+    }
+
+    const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
 
     const withTimeout = async <T>(promiseLike: PromiseLike<T>, ms = 10000): Promise<T> => {
         let timeoutId: NodeJS.Timeout | undefined;
@@ -25,48 +53,55 @@ export async function getLatestFromSupabase() {
     };
 
     try {
-        console.log("[Aviation Polling] Fetching latest timestamp from Supabase...");
+        debug.supabaseAttempted = true;
+        console.log("[Aviation Supabase] Fetching latest timestamp from aviation_history...");
         const { data: latestTS, error: tsError } = await withTimeout(
             supabase.from("aviation_history").select("timestamp").order("timestamp", { ascending: false }).limit(1)
         ) as { data: any, error: any };
 
         if (tsError) {
-            console.error("[Aviation Polling] Supabase timestamp fetch error:", tsError.message);
-            return null;
+            debug.supabaseError = tsError.message ?? String(tsError);
+            console.error("[Aviation Supabase] Timestamp fetch error:", debug.supabaseError);
+            return { data: null, debug };
         }
         if (!latestTS || latestTS.length === 0) {
-            console.log("[Aviation Polling] No historical data found in Supabase.");
-            return null;
+            console.log("[Aviation Supabase] No historical data found (aviation_history empty or no rows).");
+            return { data: null, debug };
         }
 
         const timestamp = latestTS[0].timestamp;
-        console.log(`[Aviation Polling] Found latest data from ${timestamp}. Fetching record batch...`);
+        console.log(`[Aviation Supabase] Found latest timestamp ${timestamp}. Fetching record batch...`);
 
         const { data: records, error: recError } = await withTimeout(
             supabase.from("aviation_history").select("*").eq("timestamp", timestamp)
         ) as { data: any, error: any };
 
         if (recError) {
-            console.error("[Aviation Polling] Supabase records batch fetch error:", recError.message);
-            return null;
+            debug.supabaseError = recError.message ?? String(recError);
+            console.error("[Aviation Supabase] Records batch fetch error:", debug.supabaseError);
+            return { data: null, debug };
         }
-        if (!records) return null;
+        if (!records) return { data: null, debug };
 
-        console.log(`[Aviation Polling] Success! Retrieved ${records.length} historical states.`);
+        debug.supabaseReturnedRows = records.length;
+        console.log(`[Aviation Supabase] Success. supabaseReturnedRows: ${records.length}`);
 
         const states = records.map((r: any) => [
             r.icao24, r.callsign, null, Math.floor(new Date(r.timestamp).getTime() / 1000), Math.floor(new Date(r.timestamp).getTime() / 1000), r.longitude, r.latitude, r.altitude, r.altitude === null || r.altitude <= 0, r.speed, r.heading, null, null, r.altitude, null, false, 0
         ]);
 
-        return {
+        const data = {
             states,
             time: Math.floor(new Date(timestamp).getTime() / 1000),
             _source: "supabase",
             _isFallback: true
         };
+        return { data, debug };
     } catch (e) {
-        console.error("[Aviation Polling] Fallback error:", e);
-        return null;
+        const msg = e instanceof Error ? e.message : String(e);
+        debug.supabaseError = msg;
+        console.error("[Aviation Supabase] Fallback error:", msg);
+        return { data: null, debug };
     }
 }
 

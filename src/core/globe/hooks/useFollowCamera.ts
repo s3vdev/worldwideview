@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import type { Viewer as CesiumViewer } from "cesium";
 import { useStore } from "@/core/state/store";
 import { dataBus } from "@/core/data/DataBus";
+import { followUpdateInProgress } from "../followCameraState";
 
 /**
  * Subscribes to dataBus followEntity/stopFollow and stops follow on manual camera move.
@@ -22,6 +23,7 @@ export function useFollowCamera(viewer: CesiumViewer | null, isReady: boolean) {
 
         const camera = viewer.camera;
         const stopFollowOnUserMove = () => {
+            if (followUpdateInProgress) return;
             if (useStore.getState().followEntityId) setFollowEntityId(null);
         };
         camera.moveStart.addEventListener(stopFollowOnUserMove);

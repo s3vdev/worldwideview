@@ -6,6 +6,8 @@ import { aisShipTypeToCategory } from "@/lib/ais-vessel-types";
 export const dynamic = "force-dynamic";
 
 const CACHE_KEY_MARITIME = "maritime";
+const LAST_GOOD_KEY_MARITIME = "maritime_last_good";
+const STALE_MAX_AGE_MS = 60 * 60 * 1000;
 
 export interface MaritimeDebug {
     source: "aisstream" | "aisstream-unavailable";
@@ -27,7 +29,17 @@ export async function GET(request: Request) {
 
     if (cacheTtlMs > 0) {
         const cached = get<{ vessels: unknown[]; debug: MaritimeDebug }>(CACHE_KEY_MARITIME);
-        if (cached) return NextResponse.json(cached);
+        if (cached && Array.isArray(cached.vessels) && cached.vessels.length > 0) return NextResponse.json(cached);
+        if (cached && (!Array.isArray(cached.vessels) || cached.vessels.length === 0)) {
+            const lastGood = get<{ vessels: unknown[]; debug: MaritimeDebug }>(LAST_GOOD_KEY_MARITIME);
+            if (lastGood && Array.isArray(lastGood.vessels) && lastGood.vessels.length > 0) {
+                return NextResponse.json({
+                    vessels: lastGood.vessels,
+                    debug: { ...lastGood.debug, reasonIfEmpty: "MARITIME_API_KEY not set or stream unavailable" },
+                    _stale: true,
+                });
+            }
+        }
     }
 
     startAisStream();
@@ -38,11 +50,19 @@ export async function GET(request: Request) {
         cacheHit: false,
         vesselCount: rawVessels.length,
         reasonIfEmpty: rawVessels.length === 0
-            ? "No AIS data available (stream not connected or no vessels in cache)"
+            ? (process.env.MARITIME_API_KEY ? "No AIS data available (stream not connected or no vessels in cache)" : "MARITIME_API_KEY not set")
             : undefined,
     };
 
     if (rawVessels.length === 0) {
+        const lastGood = get<{ vessels: unknown[]; debug: MaritimeDebug }>(LAST_GOOD_KEY_MARITIME);
+        if (lastGood && Array.isArray(lastGood.vessels) && lastGood.vessels.length > 0) {
+            return NextResponse.json({
+                vessels: lastGood.vessels,
+                debug: { ...lastGood.debug, reasonIfEmpty: debug.reasonIfEmpty, cacheHit: false },
+                _stale: true,
+            });
+        }
         const emptyBody = { vessels: [] as unknown[], debug };
         if (cacheTtlMs > 0) set(CACHE_KEY_MARITIME, emptyBody, Math.min(cacheTtlMs, 60 * 1000));
         return NextResponse.json(emptyBody);
@@ -72,6 +92,9 @@ export async function GET(request: Request) {
     });
 
     const body = { vessels: geoEntities, debug };
-    if (cacheTtlMs > 0) set(CACHE_KEY_MARITIME, body, cacheTtlMs);
+    if (cacheTtlMs > 0) {
+        set(CACHE_KEY_MARITIME, body, cacheTtlMs);
+        set(LAST_GOOD_KEY_MARITIME, body, STALE_MAX_AGE_MS);
+    }
     return NextResponse.json(body);
 }

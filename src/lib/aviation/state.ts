@@ -11,6 +11,8 @@ export const globalState = globalThis as unknown as {
     isFetching: boolean;
     lastSupabaseInsert: number;
     currentBackoff: number;
+    /** Last HTTP status from OpenSky (e.g. 429); used by API for debug */
+    openskyLastStatus: number | null;
 };
 
 if (globalState.aviationPollingStarted === undefined) {
@@ -23,4 +25,5 @@ if (globalState.aviationPollingStarted === undefined) {
     globalState.isFetching = false;
     globalState.lastSupabaseInsert = 0;
     globalState.currentBackoff = 8000;
+    globalState.openskyLastStatus = null;
 }

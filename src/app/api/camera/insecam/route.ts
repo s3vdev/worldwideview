@@ -7,13 +7,19 @@ async function scrapePageIds(category: string, page: number): Promise<string[]> 
     const url = `http://www.insecam.org/en/by${category}/?page=${page}`;
     const res = await fetch(url, { headers: { "User-Agent": "WorldWideView/1.0" } });
     const text = await res.text();
-    const $ = cheerio.load(text);
-    const ids: string[] = [];
-    $(".thumbnail-item__wrap").each(function () {
-        const href = $(this).attr("href");
-        if (href) ids.push(href.slice(9, -1));
-    });
-    return ids;
+    if (typeof text !== "string" || text.length === 0) return [];
+    if (!text.includes("<") || !text.includes(">")) return [];
+    try {
+        const $ = cheerio.load(text);
+        const ids: string[] = [];
+        $(".thumbnail-item__wrap").each(function () {
+            const href = $(this).attr("href");
+            if (href) ids.push(href.slice(9, -1));
+        });
+        return ids;
+    } catch {
+        return [];
+    }
 }
 
 /** Fetch camera details for a batch of IDs, returning non-null results. */

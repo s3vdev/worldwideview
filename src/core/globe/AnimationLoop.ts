@@ -15,6 +15,7 @@ import { useStore } from "@/core/state/store";
 import { getEntityColor, createLabel, removeLabel, type AnimatableItem } from "./EntityRenderer";
 import { updateModelTransform } from "./ModelManager";
 import { pluginManager } from "@/core/plugins/PluginManager";
+import { setFollowUpdateInProgress } from "./followCameraState";
 
 /** Touch-friendly default point size: larger on mobile (coarse pointer). */
 function defaultPointSize(): number {
@@ -36,6 +37,15 @@ const scratchVelocity = new Cartesian3();
 const scratchSphere = new BoundingSphere(new Cartesian3(), 100); // 100m radius roughly
 const scratchNorthPole = new Cartesian3(0, 0, 1);
 const scratchSurfaceNormal = new Cartesian3();
+
+// Follow camera: reuse scratch vectors (no per-frame allocation)
+const FOLLOW_DISTANCE = 5000;
+const FOLLOW_PITCH_DEG = -25;
+const FOLLOW_LERP = 0.12;
+const scratchFollowENU = new Cartesian3();
+const scratchFollowFixed = new Cartesian3();
+const scratchFollowCameraPos = new Cartesian3();
+const scratchFollowMatrix = new Matrix4();
 
 /**
  * Creates the per-frame update function for entity position extrapolation,
@@ -183,26 +193,31 @@ export function createUpdateLoop(
             if (!item) {
                 useStore.getState().setFollowEntityId(null);
             } else {
-                const entityPos = item.posRef;
-                const headingDeg = item.entity.heading ?? 0;
-                const headingRad = CesiumMath.toRadians(headingDeg);
-                const pitchRad = CesiumMath.toRadians(FOLLOW_PITCH_DEG);
-                const horizontalDist = FOLLOW_DISTANCE * Math.cos(pitchRad);
-                const upOffset = FOLLOW_DISTANCE * Math.sin(pitchRad);
-                // Offset "behind" entity: opposite to heading in ENU (east, north, up)
-                scratchFollowENU.x = -horizontalDist * Math.sin(headingRad);
-                scratchFollowENU.y = -horizontalDist * Math.cos(headingRad);
-                scratchFollowENU.z = upOffset;
-                Transforms.eastNorthUpToFixedFrame(entityPos, Ellipsoid.WGS84, scratchFollowMatrix);
-                Matrix4.multiplyByPoint(scratchFollowMatrix, scratchFollowENU, scratchFollowFixed);
-                Cartesian3.add(entityPos, scratchFollowFixed, scratchFollowCameraPos);
-                Cartesian3.lerp(cam.position, scratchFollowCameraPos, FOLLOW_LERP, scratchFollowFixed);
-                cam.position.x = scratchFollowFixed.x;
-                cam.position.y = scratchFollowFixed.y;
-                cam.position.z = scratchFollowFixed.z;
-                Cartesian3.subtract(entityPos, cam.position, scratchFollowFixed);
-                Cartesian3.normalize(scratchFollowFixed, cam.direction);
-                Ellipsoid.WGS84.geodeticSurfaceNormal(cam.position, cam.up);
+                setFollowUpdateInProgress(true);
+                try {
+                    const entityPos = item.posRef;
+                    const headingDeg = item.entity.heading ?? 0;
+                    const headingRad = CesiumMath.toRadians(headingDeg);
+                    const pitchRad = CesiumMath.toRadians(FOLLOW_PITCH_DEG);
+                    const horizontalDist = FOLLOW_DISTANCE * Math.cos(pitchRad);
+                    const upOffset = FOLLOW_DISTANCE * Math.sin(pitchRad);
+                    // Offset "behind" entity: opposite to heading in ENU (east, north, up)
+                    scratchFollowENU.x = -horizontalDist * Math.sin(headingRad);
+                    scratchFollowENU.y = -horizontalDist * Math.cos(headingRad);
+                    scratchFollowENU.z = upOffset;
+                    Transforms.eastNorthUpToFixedFrame(entityPos, Ellipsoid.WGS84, scratchFollowMatrix);
+                    Matrix4.multiplyByPoint(scratchFollowMatrix, scratchFollowENU, scratchFollowFixed);
+                    Cartesian3.add(entityPos, scratchFollowFixed, scratchFollowCameraPos);
+                    Cartesian3.lerp(cam.position, scratchFollowCameraPos, FOLLOW_LERP, scratchFollowFixed);
+                    cam.position.x = scratchFollowFixed.x;
+                    cam.position.y = scratchFollowFixed.y;
+                    cam.position.z = scratchFollowFixed.z;
+                    Cartesian3.subtract(entityPos, cam.position, scratchFollowFixed);
+                    Cartesian3.normalize(scratchFollowFixed, cam.direction);
+                    Ellipsoid.WGS84.geodeticSurfaceNormal(cam.position, cam.up);
+                } finally {
+                    setFollowUpdateInProgress(false);
+                }
             }
         }
     };

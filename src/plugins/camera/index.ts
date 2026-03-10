@@ -7,7 +7,7 @@ import { CameraDetail } from "./CameraDetail";
 import { CameraSettings } from "./CameraSettings";
 import { useStore } from "@/core/state/store";
 import { SmartFetcher } from "@/core/data/SmartFetcher";
-import { streamInsecamCameras } from "./insecamStream";
+import { parseInsecamCamera } from "./insecamStream";
 import { mapRawCamera } from "./cameraMapper";
 
 export class CameraPlugin implements WorldPlugin {
@@ -74,10 +74,14 @@ export class CameraPlugin implements WorldPlugin {
     }
 
     private async loadDefaultSource(): Promise<void> {
-        const data = await SmartFetcher.fetchJson("/cameras.json");
-        if (Array.isArray(data)) {
-            this.sourceBuckets["default"] = data.map((c, i) => mapRawCamera(c, i, "default"));
+        const [jsonData] = await Promise.all([
+            SmartFetcher.fetchJson("/cameras.json"),
+            this.loadInsecamFromCache("rating"),
+        ]);
+        if (Array.isArray(jsonData)) {
+            this.sourceBuckets["default"] = jsonData.map((c, i) => mapRawCamera(c, i, "default"));
         }
+        this.pushUpdate();
     }
 
     private async loadUrlSource(settings: any): Promise<void> {
@@ -96,21 +100,31 @@ export class CameraPlugin implements WorldPlugin {
     }
 
     private async startInsecamStream(settings: any): Promise<void> {
+        await this.loadInsecamFromCache(settings.insecamCategory || "rating");
+        this.pushUpdate();
+    }
+
+    /** Fetch insecam cameras via the cached API endpoint. */
+    private async loadInsecamFromCache(category: string): Promise<void> {
         this.insecamAbort?.abort();
         this.insecamAbort = new AbortController();
-        this.sourceBuckets["insecam"] = [];
 
-        await streamInsecamCameras(
-            settings.insecamCategory || "rating",
-            settings.insecamLimit || 90,
-            (batch) => {
-                this.sourceBuckets["insecam"] = [...(this.sourceBuckets["insecam"] || []), ...batch];
-                this.pushUpdate();
-            },
-            this.insecamAbort.signal,
-        ).catch((err) => {
-            if (err.name !== "AbortError") console.error("[CameraPlugin] Insecam stream error:", err);
-        });
+        try {
+            const res = await fetch(
+                `/api/camera/insecam?category=${category}`,
+                { signal: this.insecamAbort.signal },
+            );
+            if (!res.ok) return;
+
+            const data = await res.json();
+            if (data.cameras && Array.isArray(data.cameras)) {
+                this.sourceBuckets["insecam"] = data.cameras.map((c: any, i: number) =>
+                    parseInsecamCamera(c, i)
+                );
+            }
+        } catch (err: any) {
+            if (err.name !== "AbortError") console.error("[CameraPlugin] Insecam fetch error:", err);
+        }
     }
 
     getPollingInterval(): number { return 3600000; }

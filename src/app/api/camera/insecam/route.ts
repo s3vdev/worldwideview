@@ -1,88 +1,56 @@
 import { NextRequest } from "next/server";
-import * as insecam from "insecam-api";
-import * as cheerio from "cheerio";
+import { getCachedInsecam, setCachedInsecam } from "@/lib/camera/insecamCache";
+import { scrapeInsecamCameras } from "./scraper";
 
-/** Scrape a single page of Insecam and return camera IDs. */
-async function scrapePageIds(category: string, page: number): Promise<string[]> {
-    const url = `http://www.insecam.org/en/by${category}/?page=${page}`;
-    const res = await fetch(url, { headers: { "User-Agent": "WorldWideView/1.0" } });
-    const text = await res.text();
-    const $ = cheerio.load(text);
-    const ids: string[] = [];
-    $(".thumbnail-item__wrap").each(function () {
-        const href = $(this).attr("href");
-        if (href) ids.push(href.slice(9, -1));
-    });
-    return ids;
+const MAX_LIMIT = 2000;
+
+/** Scrape and persist cameras to cache (runs in background). */
+async function refreshCache(category: string): Promise<void> {
+    const allCameras: any[] = [];
+    await scrapeInsecamCameras(category, MAX_LIMIT, (batch: any[]) => allCameras.push(...batch));
+    if (allCameras.length > 0) {
+        await setCachedInsecam(category, allCameras);
+        console.log(`[Insecam] Cache refreshed: ${allCameras.length} cameras (category=${category})`);
+    }
 }
-
-/** Fetch camera details for a batch of IDs, returning non-null results. */
-async function fetchCameraBatch(ids: string[]): Promise<any[]> {
-    const results = await Promise.all(
-        ids.map(async (id) => {
-            try { return await insecam.camera(id); }
-            catch { return null; }
-        })
-    );
-    return results.filter(Boolean);
-}
-
-const MAX_CONCURRENT = 10;
 
 export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const category = searchParams.get("category") || "rating";
-    const limitParam = searchParams.get("limit");
-    const limit = limitParam ? parseInt(limitParam, 10) : 90;
-    const limitSafe = isNaN(limit) || limit < 6 ? 90 : Math.min(limit, 600);
-    const pagesToFetch = Math.ceil(limitSafe / 6);
 
-    const stream = new ReadableStream({
-        async start(controller) {
-            try {
-                // 1. Scrape all pages concurrently to collect camera IDs
-                const pagePromises = Array.from({ length: pagesToFetch }, (_, i) =>
-                    scrapePageIds(category, i + 1).catch(() => [] as string[])
-                );
-                const pageResults = await Promise.all(pagePromises);
-                const cameraIds = pageResults.flat().slice(0, limitSafe);
-
-                if (cameraIds.length === 0) {
-                    controller.enqueue(new TextEncoder().encode(
-                        JSON.stringify({ error: "No cameras found" }) + "\n"
-                    ));
-                    controller.close();
-                    return;
-                }
-
-                // 2. Fetch details in batches; stream each batch as NDJSON
-                for (let i = 0; i < cameraIds.length; i += MAX_CONCURRENT) {
-                    const batch = cameraIds.slice(i, i + MAX_CONCURRENT);
-                    const cameras = await fetchCameraBatch(batch);
-                    if (cameras.length > 0) {
-                        const line = JSON.stringify({ cameras }) + "\n";
-                        controller.enqueue(new TextEncoder().encode(line));
-                    }
-                }
-
-                controller.close();
-            } catch (err: any) {
-                console.error("[Insecam Proxy] Stream error:", err);
-                try {
-                    controller.enqueue(new TextEncoder().encode(
-                        JSON.stringify({ error: err.message }) + "\n"
-                    ));
-                } catch { /* controller may already be closed */ }
-                controller.close();
-            }
-        },
+    // 1. Check cache
+    const cached = await getCachedInsecam(category).catch((err) => {
+        console.error("[Insecam] Cache check failed:", err);
+        return null;
     });
 
-    return new Response(stream, {
-        headers: {
-            "Content-Type": "application/x-ndjson",
-            "Transfer-Encoding": "chunked",
-            "Cache-Control": "no-cache",
-        },
-    });
+    // 2. If we have ANY cached data, return it immediately
+    if (cached && cached.cameras.length > 0) {
+        if (!cached.isFresh) {
+            refreshCache(category).catch((err) =>
+                console.error("[Insecam] Background refresh failed:", err)
+            );
+        }
+        console.log(`[Insecam] Serving ${cached.cameras.length} cameras from cache (fresh=${cached.isFresh})`);
+        return Response.json({ cameras: cached.cameras });
+    }
+
+    // 3. No cache — scrape synchronously, cache, and return
+    try {
+        const allCameras: any[] = [];
+        await scrapeInsecamCameras(category, MAX_LIMIT, (batch: any[]) => {
+            allCameras.push(...batch);
+        });
+
+        if (allCameras.length > 0) {
+            setCachedInsecam(category, allCameras).catch((err) =>
+                console.error("[Insecam] Cache write failed:", err)
+            );
+        }
+
+        return Response.json({ cameras: allCameras });
+    } catch (err: any) {
+        console.error("[Insecam] Scrape error:", err);
+        return Response.json({ cameras: [], error: err.message }, { status: 502 });
+    }
 }

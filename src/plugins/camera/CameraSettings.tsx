@@ -2,7 +2,7 @@
 
 import React, { ChangeEvent } from "react";
 import { useStore } from "@/core/state/store";
-import { Upload, Link as LinkIcon, Database, RotateCcw } from "lucide-react";
+import { Upload, Link as LinkIcon, Database, RotateCcw, Webcam } from "lucide-react";
 import { pluginManager } from "@/core/plugins/PluginManager";
 import { inputGroupStyle, labelStyle, inputStyle, loadButtonStyle, sourceTabStyle } from "./cameraSettingsStyles";
 import { InsecamSection } from "./InsecamSection";
@@ -65,7 +65,7 @@ export const CameraSettings: React.FC<{ pluginId: string }> = ({ pluginId }) => 
             </div>
 
             <div style={{ display: "flex", gap: "var(--space-xs)" }}>
-                {([["default", Database, "Default"], ["url", LinkIcon, "URL"], ["file", Upload, "File"]] as const).map(
+                {([["default", Database, "Default"], ["insecam", Webcam, "Insecam"], ["url", LinkIcon, "URL"], ["file", Upload, "File"]] as const).map(
                     ([type, Icon, label]) => (
                         <button key={type} onClick={() => handleSourceTypeChange(type as any)} style={sourceTabStyle(settings.sourceType === type)}>
                             <Icon size={14} />
@@ -108,9 +108,8 @@ export const CameraSettings: React.FC<{ pluginId: string }> = ({ pluginId }) => 
 
             {settings.sourceType === "insecam" && (
                 <InsecamSection
-                    settings={settings} pluginId={pluginId} isLoading={isLoading}
+                    settings={settings} isLoading={isLoading}
                     onCategoryChange={(e) => updatePluginSettings(pluginId, { insecamCategory: e.target.value })}
-                    onLimitChange={(limit) => updatePluginSettings(pluginId, { insecamLimit: limit })}
                     onLoad={handleLoadData}
                 />
             )}

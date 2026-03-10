@@ -20,20 +20,18 @@ export function useFollowCamera(viewer: CesiumViewer | null, isReady: boolean) {
             setFollowEntityId(null);
         });
 
-        const controller = viewer.scene.screenSpaceCameraController;
+        const camera = viewer.camera;
         const stopFollowOnUserMove = () => {
             if (useStore.getState().followEntityId) setFollowEntityId(null);
         };
-        controller.moveStart.addEventListener(stopFollowOnUserMove);
-        controller.rotateStart.addEventListener(stopFollowOnUserMove);
-        controller.zoomStart.addEventListener(stopFollowOnUserMove);
+        camera.moveStart.addEventListener(stopFollowOnUserMove);
+        camera.moveEnd.addEventListener(stopFollowOnUserMove);
 
         return () => {
             unsubFollow();
             unsubStop();
-            controller.moveStart.removeEventListener(stopFollowOnUserMove);
-            controller.rotateStart.removeEventListener(stopFollowOnUserMove);
-            controller.zoomStart.removeEventListener(stopFollowOnUserMove);
+            camera.moveStart.removeEventListener(stopFollowOnUserMove);
+            camera.moveEnd.removeEventListener(stopFollowOnUserMove);
         };
     }, [viewer, isReady, setFollowEntityId]);
 }

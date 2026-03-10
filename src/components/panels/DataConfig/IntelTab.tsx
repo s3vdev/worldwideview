@@ -5,6 +5,23 @@ import { Eye, MapPin, Lock, Unlock, Star } from "lucide-react";
 import { dataBus } from "@/core/data/DataBus";
 import { sectionHeaderStyle } from "./sharedStyles";
 
+/** Format entity property value for display (avoid [object Object] for arrays/objects) */
+function formatPropValue(key: string, value: unknown): string {
+    if (value === null || value === undefined) return "";
+    if (typeof value === "boolean") return value ? "Yes" : "No";
+    if (Array.isArray(value)) {
+        if (value.length === 0) return "—";
+        const first = value[0];
+        if (typeof first === "object" && first !== null && "latitude" in first) {
+            return `${value.length} vertices (polygon boundary)`;
+        }
+        if (typeof first === "object") return `${value.length} items`;
+        return value.map((v) => String(v)).join(", ");
+    }
+    if (typeof value === "object") return JSON.stringify(value).slice(0, 80) + (JSON.stringify(value).length > 80 ? "…" : "");
+    return String(value);
+}
+
 export function IntelTab() {
     const selectedEntity = useStore((s) => s.selectedEntity);
     const lockedEntityId = useStore((s) => s.lockedEntityId);
@@ -103,9 +120,7 @@ export function IntelTab() {
                                     {key.replace(/_/g, " ")}
                                 </span>
                                 <span className="intel-panel__prop-value">
-                                    {typeof value === "boolean"
-                                        ? value ? "Yes" : "No"
-                                        : String(value)}
+                                    {formatPropValue(key, value)}
                                 </span>
                             </div>
                         ))}

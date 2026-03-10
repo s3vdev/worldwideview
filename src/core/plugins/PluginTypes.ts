@@ -260,4 +260,6 @@ export type DataBusEvents = {
     cameraPreset: { presetId: string };
     cameraFaceTowards: { lat: number; lon: number; alt: number };
     cameraGoTo: { lat: number; lon: number; alt: number; distance?: number; maxPitch?: number; heading?: number };
+    followEntity: { id: string };
+    stopFollow: Record<string, never>;
 };

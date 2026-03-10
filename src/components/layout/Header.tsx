@@ -25,7 +25,14 @@ export function Header() {
     const isMobile = useIsMobile();
     const timeWindow = useStore((s) => s.timeWindow);
     const setTimeWindow = useStore((s) => s.setTimeWindow);
+    const followEntityId = useStore((s) => s.followEntityId);
+    const entitiesByPlugin = useStore((s) => s.entitiesByPlugin);
     const [searchExpanded, setSearchExpanded] = useState(false);
+
+    const followEntity = followEntityId
+        ? Object.values(entitiesByPlugin).flat().find((e) => e.id === followEntityId)
+        : null;
+    const followLabel = followEntity?.properties?.label ?? followEntity?.id ?? followEntityId ?? "";
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -72,6 +79,21 @@ export function Header() {
                         >
                             <Search size={18} />
                         </button>
+                    )}
+                    {followEntityId && (
+                        <div className="header__following" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span className="status-badge" style={{ color: "var(--accent-cyan)" }}>
+                                Following: {followLabel.slice(0, 12)}{followLabel.length > 12 ? "…" : ""}
+                            </span>
+                            <button
+                                type="button"
+                                className="btn btn--icon"
+                                onClick={() => dataBus.emit("stopFollow", {})}
+                                title="Stop following"
+                            >
+                                <X size={14} />
+                            </button>
+                        </div>
                     )}
                     <div className="status-badge">
                         <span className="status-badge__dot" />
@@ -129,9 +151,23 @@ export function Header() {
                 </div>
                 {/* Always-visible right-side actions */}
                 <div className="header__actions">
+                    {followEntityId && (
+                        <div className="header__following" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span className="status-badge" style={{ color: "var(--accent-cyan)" }}>
+                                Following: {followLabel.slice(0, 16)}{followLabel.length > 16 ? "…" : ""}
+                            </span>
+                            <button
+                                type="button"
+                                className="btn btn--icon"
+                                onClick={() => dataBus.emit("stopFollow", {})}
+                                title="Stop following"
+                            >
+                                <X size={14} />
+                            </button>
+                        </div>
+                    )}
                     {/* Separator */}
                     <div style={{ width: 1, height: 20, background: "var(--border-subtle)" }} />
-                    {/* Live indicator */}
                     <div className="status-badge">
                         <span className="status-badge__dot" />
                         LIVE

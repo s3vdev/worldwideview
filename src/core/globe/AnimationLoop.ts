@@ -5,7 +5,9 @@ import {
     Ellipsoid,
     BoundingSphere,
     Intersect,
-    CullingVolume
+    CullingVolume,
+    Matrix4,
+    Transforms,
 } from "cesium";
 import type { Viewer as CesiumViewer } from "cesium";
 import type { GeoEntity, CesiumEntityOptions } from "@/core/plugins/PluginTypes";
@@ -173,6 +175,36 @@ export function createUpdateLoop(
                 }
             }
         }
+
+        // Follow camera: smooth tracking of followed entity (runs every frame, no flyTo)
+        const followId = useStore.getState().followEntityId;
+        if (followId) {
+            const item = animatablesMapRef.current.get(followId);
+            if (!item) {
+                useStore.getState().setFollowEntityId(null);
+            } else {
+                const entityPos = item.posRef;
+                const headingDeg = item.entity.heading ?? 0;
+                const headingRad = CesiumMath.toRadians(headingDeg);
+                const pitchRad = CesiumMath.toRadians(FOLLOW_PITCH_DEG);
+                const horizontalDist = FOLLOW_DISTANCE * Math.cos(pitchRad);
+                const upOffset = FOLLOW_DISTANCE * Math.sin(pitchRad);
+                // Offset "behind" entity: opposite to heading in ENU (east, north, up)
+                scratchFollowENU.x = -horizontalDist * Math.sin(headingRad);
+                scratchFollowENU.y = -horizontalDist * Math.cos(headingRad);
+                scratchFollowENU.z = upOffset;
+                Transforms.eastNorthUpToFixedFrame(entityPos, Ellipsoid.WGS84, scratchFollowMatrix);
+                Matrix4.multiplyByPoint(scratchFollowMatrix, scratchFollowENU, scratchFollowFixed);
+                Cartesian3.add(entityPos, scratchFollowFixed, scratchFollowCameraPos);
+                Cartesian3.lerp(cam.position, scratchFollowCameraPos, FOLLOW_LERP, scratchFollowFixed);
+                cam.position.x = scratchFollowFixed.x;
+                cam.position.y = scratchFollowFixed.y;
+                cam.position.z = scratchFollowFixed.z;
+                Cartesian3.subtract(entityPos, cam.position, scratchFollowFixed);
+                Cartesian3.normalize(scratchFollowFixed, cam.direction);
+                Ellipsoid.WGS84.geodeticSurfaceNormal(cam.position, cam.up);
+            }
+        }
     };
 }
 
@@ -252,7 +284,7 @@ function applyHighlight(item: AnimatableItem, isSelected: boolean, isHovered: bo
             const baseScale = options.size ? options.size / 24 : 0.5;
             primitive.scale = baseScale * 1.2; // 20% larger when hovered
         } else {
-            primitive.pixelSize = (options.size || 6) * 1.5;
+            primitive.pixelSize = (options.size || defaultPointSize()) * 1.5;
             primitive.outlineColor = HIGHLIGHT_COLOR_HOVERED;
             primitive.outlineWidth = 2;
         }

@@ -1,62 +1,39 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import type { Viewer as CesiumViewer } from "cesium";
-import { Cartesian3 } from "cesium";
 import { useStore } from "@/core/state/store";
-
-const FOLLOW_INTERVAL_MS = 500;
-const FOLLOW_ALTITUDE_OFFSET = 8000; // meters above entity
+import { dataBus } from "@/core/data/DataBus";
 
 /**
- * When followEntityId is set, smoothly updates the camera to track that entity.
- * Stops when entity is not found (e.g. disappeared from data) or followEntityId is cleared.
+ * Subscribes to dataBus followEntity/stopFollow and stops follow on manual camera move.
+ * Actual camera tracking runs every frame inside AnimationLoop (no setInterval, no flyTo).
  */
 export function useFollowCamera(viewer: CesiumViewer | null, isReady: boolean) {
-    const followEntityId = useStore((s) => s.followEntityId);
     const setFollowEntityId = useStore((s) => s.setFollowEntityId);
-    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     useEffect(() => {
         if (!viewer || !isReady) return;
 
-        const tick = () => {
-            const id = useStore.getState().followEntityId;
-            if (!id) return;
+        const unsubFollow = dataBus.on("followEntity", ({ id }) => {
+            setFollowEntityId(id);
+        });
+        const unsubStop = dataBus.on("stopFollow", () => {
+            setFollowEntityId(null);
+        });
 
-            const entitiesByPlugin = useStore.getState().entitiesByPlugin;
-            const allEntities = Object.values(entitiesByPlugin).flat();
-            const entity = allEntities.find((e) => e.id === id);
-
-            if (!entity) {
-                useStore.getState().setFollowEntityId(null);
-                return;
-            }
-
-            const lon = entity.longitude;
-            const lat = entity.latitude;
-            const alt = entity.altitude ?? 0;
-            const destination = Cartesian3.fromDegrees(
-                lon,
-                lat,
-                Math.max(alt + FOLLOW_ALTITUDE_OFFSET, 10000)
-            );
-
-            viewer.camera.flyTo({
-                destination,
-                duration: 0.4,
-                complete: undefined,
-            });
+        const controller = viewer.scene.screenSpaceCameraController;
+        const stopFollowOnUserMove = () => {
+            if (useStore.getState().followEntityId) setFollowEntityId(null);
         };
-
-        if (followEntityId) {
-            tick();
-            intervalRef.current = setInterval(tick, FOLLOW_INTERVAL_MS);
-        }
+        controller.moveStart.addEventListener(stopFollowOnUserMove);
+        controller.rotateStart.addEventListener(stopFollowOnUserMove);
+        controller.zoomStart.addEventListener(stopFollowOnUserMove);
 
         return () => {
-            if (intervalRef.current) {
-                clearInterval(intervalRef.current);
-                intervalRef.current = null;
-            }
+            unsubFollow();
+            unsubStop();
+            controller.moveStart.removeEventListener(stopFollowOnUserMove);
+            controller.rotateStart.removeEventListener(stopFollowOnUserMove);
+            controller.zoomStart.removeEventListener(stopFollowOnUserMove);
         };
-    }, [viewer, isReady, followEntityId, setFollowEntityId]);
+    }, [viewer, isReady, setFollowEntityId]);
 }

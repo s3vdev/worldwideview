@@ -31,7 +31,10 @@ export async function pollAviation() {
         });
 
         if (!res.ok) {
-            // Apply exponential backoff: double the interval up to 5 minutes
+            // Invalidate token so next poll uses a fresh one (rotate immediately on any API failure)
+            globalState.accessToken = null;
+            globalState.tokenExpiry = 0;
+
             globalState.currentBackoff = Math.min((globalState.currentBackoff || POLL_INTERVAL) * 2, 5 * 60 * 1000);
 
             const retryAfter = res.headers.get("Retry-After");
@@ -39,7 +42,7 @@ export async function pollAviation() {
 
             console.warn(`[Aviation Polling] OpenSky returned ${res.status}: ${res.statusText}${retryInfo} (Backing off to ${globalState.currentBackoff / 1000}s)`);
 
-            // If rate limited and we have NO cache, we might want to try fallback.
+            // If rate limited and we have NO cache, try fallback.
             // We'll update the cache with fallback data if needed.
             if (res.status === 429 && !globalState.aviationData) {
                 console.log("[Aviation Polling] Rate limited by OpenSky and no cache. Attempting fallback to Supabase history...");

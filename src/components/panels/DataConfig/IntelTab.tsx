@@ -1,7 +1,7 @@
 import { useStore } from "@/core/state/store";
 import { pluginManager } from "@/core/plugins/PluginManager";
 import { PluginIcon } from "@/components/common/PluginIcon";
-import { Eye, MapPin, Lock, Unlock, Star } from "lucide-react";
+import { Eye, MapPin, Lock, Unlock, Star, Crosshair, Square } from "lucide-react";
 import { dataBus } from "@/core/data/DataBus";
 import { sectionHeaderStyle } from "./sharedStyles";
 
@@ -25,7 +25,9 @@ function formatPropValue(key: string, value: unknown): string {
 export function IntelTab() {
     const selectedEntity = useStore((s) => s.selectedEntity);
     const lockedEntityId = useStore((s) => s.lockedEntityId);
+    const followEntityId = useStore((s) => s.followEntityId);
     const setLockedEntityId = useStore((s) => s.setLockedEntityId);
+    const setFollowEntityId = useStore((s) => s.setFollowEntityId);
     const favorites = useStore((s) => s.favorites);
     const addFavorite = useStore((s) => s.addFavorite);
     const removeFavorite = useStore((s) => s.removeFavorite);
@@ -145,9 +147,8 @@ export function IntelTab() {
                 </button>
                 <button
                     className="intel-panel__action-btn"
-                    title="Go to entity"
+                    title="Go to entity (one-time)"
                     onClick={() => {
-                        console.log("[Intel] Go To button clicked", selectedEntity.latitude, selectedEntity.longitude);
                         dataBus.emit("cameraGoTo", {
                             lat: selectedEntity.latitude,
                             lon: selectedEntity.longitude,
@@ -159,11 +160,33 @@ export function IntelTab() {
                     <span>Go To</span>
                 </button>
                 <button
+                    className={`intel-panel__action-btn ${followEntityId === selectedEntity.id ? "intel-panel__action-btn--active" : ""}`}
+                    title={followEntityId === selectedEntity.id ? "Stop following" : "Follow (camera tracks entity over time)"}
+                    onClick={() => {
+                        if (followEntityId === selectedEntity.id) {
+                            setFollowEntityId(null);
+                        } else {
+                            setLockedEntityId(null);
+                            setFollowEntityId(selectedEntity.id);
+                        }
+                    }}
+                >
+                    {followEntityId === selectedEntity.id
+                        ? <><Square size={14} /><span>Stop Follow</span></>
+                        : <><Crosshair size={14} /><span>Follow</span></>
+                    }
+                </button>
+                <button
                     className={`intel-panel__action-btn ${lockedEntityId === selectedEntity.id ? "intel-panel__action-btn--active" : ""}`}
                     title={lockedEntityId === selectedEntity.id ? "Unlock camera" : "Lock camera to entity"}
-                    onClick={() => setLockedEntityId(
-                        lockedEntityId === selectedEntity.id ? null : selectedEntity.id
-                    )}
+                    onClick={() => {
+                        if (lockedEntityId === selectedEntity.id) {
+                            setLockedEntityId(null);
+                        } else {
+                            setFollowEntityId(null);
+                            setLockedEntityId(selectedEntity.id);
+                        }
+                    }}
                 >
                     {lockedEntityId === selectedEntity.id
                         ? <><Unlock size={14} /><span>Unlock</span></>

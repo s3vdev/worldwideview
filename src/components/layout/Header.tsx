@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/core/state/store";
 import { dataBus } from "@/core/data/DataBus";
 import { pluginManager } from "@/core/plugins/PluginManager";
-import { Globe, Menu, Settings, Filter } from "lucide-react";
+import { Globe, Search, X } from "lucide-react";
 import { SearchBar } from "./SearchBar";
+import { useIsMobile } from "@/core/hooks/useIsMobile";
 
 const REGIONS = [
     { id: "global", label: "Global", icon: Globe },
@@ -21,14 +22,10 @@ const REGIONS = [
 const TIME_WINDOWS = ["1h", "6h", "24h", "48h", "7d"] as const;
 
 export function Header() {
+    const isMobile = useIsMobile();
     const timeWindow = useStore((s) => s.timeWindow);
     const setTimeWindow = useStore((s) => s.setTimeWindow);
-    const toggleLeftSidebar = useStore((s) => s.toggleLeftSidebar);
-    const toggleConfigPanel = useStore((s) => s.toggleConfigPanel);
-    const toggleFilterPanel = useStore((s) => s.toggleFilterPanel);
-    const filterCount = useStore((s) =>
-        Object.values(s.filters).reduce((sum, pf) => sum + Object.keys(pf).length, 0)
-    );
+    const [searchExpanded, setSearchExpanded] = useState(false);
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -49,6 +46,42 @@ export function Header() {
         return () => el.removeEventListener("wheel", handleWheel);
     }, []);
 
+    if (isMobile) {
+        return (
+            <header className="header header--mobile glass-panel">
+                <div className="header__brand">
+                    <div className="header__logo">WorldWideView</div>
+                </div>
+                <div className="header__actions">
+                    {searchExpanded ? (
+                        <div className="header__search-expanded">
+                            <SearchBar />
+                            <button
+                                className="btn btn--icon"
+                                onClick={() => setSearchExpanded(false)}
+                                title="Close search"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+                    ) : (
+                        <button
+                            className="btn btn--icon header__search-btn"
+                            onClick={() => setSearchExpanded(true)}
+                            title="Search"
+                        >
+                            <Search size={18} />
+                        </button>
+                    )}
+                    <div className="status-badge">
+                        <span className="status-badge__dot" />
+                        LIVE
+                    </div>
+                </div>
+            </header>
+        );
+    }
+
     return (
         <header className="header glass-panel">
             <div className="header__brand">
@@ -56,7 +89,6 @@ export function Header() {
                     <div className="header__logo">WorldWideView</div>
                     <div className="header__subtitle">Geospatial Intelligence</div>
                 </div>
-                {/* Search Bar moved here to prevent dropdown clipping */}
                 <div style={{ marginLeft: "var(--space-xl)" }}>
                     <SearchBar />
                 </div>

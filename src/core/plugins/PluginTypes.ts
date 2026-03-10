@@ -253,6 +253,7 @@ export type DataBusEvents = {
     entitySelected: { entity: GeoEntity | null };
     layerToggled: { pluginId: string; enabled: boolean };
     timeRangeChanged: { timeRange: TimeRange };
+    globeReady: Record<string, never>;
     cameraPreset: { presetId: string };
     cameraFaceTowards: { lat: number; lon: number; alt: number };
     cameraGoTo: { lat: number; lon: number; alt: number; distance?: number; maxPitch?: number; heading?: number };

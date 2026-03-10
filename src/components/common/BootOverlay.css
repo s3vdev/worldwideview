@@ -1,0 +1,107 @@
+/* ─── Boot Overlay ────────────────────────────────────────── */
+.boot-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-primary);
+    transition: opacity 800ms var(--ease-smooth),
+                transform 600ms var(--ease-smooth);
+}
+
+.boot-overlay--hidden {
+    opacity: 0;
+    transform: scale(1.04);
+    pointer-events: none;
+}
+
+/* Orbital rings */
+.boot-overlay__rings {
+    position: relative;
+    width: 160px;
+    height: 160px;
+    margin-bottom: var(--space-2xl);
+}
+
+.boot-overlay__ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 1.5px dashed transparent;
+}
+
+.boot-overlay__ring--1 {
+    inset: 0;
+    border-color: rgba(34, 211, 238, 0.4);
+    animation: bootOrbitSpin 6s linear infinite;
+}
+
+.boot-overlay__ring--2 {
+    inset: 20px;
+    border-color: rgba(59, 130, 246, 0.35);
+    animation: bootOrbitSpin 4s linear infinite reverse;
+}
+
+.boot-overlay__ring--3 {
+    inset: 40px;
+    border-color: rgba(167, 139, 250, 0.3);
+    animation: bootOrbitSpin 8s linear infinite;
+}
+
+@keyframes bootOrbitSpin {
+    to { transform: rotate(360deg); }
+}
+
+.boot-overlay__core {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 12px;
+    height: 12px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: var(--accent-cyan);
+    box-shadow: 0 0 20px rgba(34, 211, 238, 0.6),
+                0 0 60px rgba(34, 211, 238, 0.3);
+    animation: bootCorePulse 2s ease-in-out infinite;
+}
+
+@keyframes bootCorePulse {
+    0%, 100% { transform: translate(-50%, -50%) scale(1);   opacity: 1; }
+    50%      { transform: translate(-50%, -50%) scale(1.4); opacity: 0.7; }
+}
+
+.boot-overlay__title {
+    font-family: var(--font-ui);
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: bootHudFlickerIn 1.2s var(--ease-smooth) both;
+}
+
+.boot-overlay__status {
+    margin-top: var(--space-sm);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    animation: bootHudFlickerIn 1.2s var(--ease-smooth) 0.4s both;
+}
+
+@keyframes bootHudFlickerIn {
+    0%   { opacity: 0; }
+    15%  { opacity: 0.7; }
+    30%  { opacity: 0.2; }
+    50%  { opacity: 0.9; }
+    70%  { opacity: 0.4; }
+    85%  { opacity: 1; }
+    100% { opacity: 1; }
+}

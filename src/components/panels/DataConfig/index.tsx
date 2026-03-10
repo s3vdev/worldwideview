@@ -1,4 +1,5 @@
 import { useStore } from "@/core/state/store";
+import { useIsMobile } from "@/core/hooks/useIsMobile";
 import { FilterSection } from "@/components/panels/FilterPanel";
 import { Info, Key } from "lucide-react";
 
@@ -9,16 +10,19 @@ import { ApiKeysTab } from "./ApiKeysTab";
 import { sectionHeaderStyle } from "./sharedStyles";
 
 export function DataConfigPanel() {
+    const isMobile = useIsMobile();
     const configPanelOpen = useStore((s) => s.configPanelOpen);
+    const openMobilePanel = useStore((s) => s.openMobilePanel);
     const selectedEntity = useStore((s) => s.selectedEntity);
     const activeTab = useStore((s) => s.activeConfigTab);
     const setActiveTab = useStore((s) => s.setActiveConfigTab);
 
+    const isRightOpen = isMobile ? openMobilePanel === "right" : configPanelOpen;
 
     return (
         <aside
-            className={`sidebar sidebar--right glass-panel ${configPanelOpen ? "" : "sidebar--closed"}`}
-            style={{ width: 320, padding: "var(--space-xl)", zIndex: 101, borderLeft: "var(--glass-border)" }}
+            className={`sidebar sidebar--right glass-panel ${isMobile ? "sidebar--mobile" : ""} ${isRightOpen ? "" : "sidebar--closed"}`}
+            style={{ width: isMobile ? undefined : 320, padding: "var(--space-xl)", zIndex: 101, borderLeft: "var(--glass-border)" }}
         >
             <div className="sidebar__title" style={{ marginBottom: "var(--space-md)", color: "var(--text-primary)", fontSize: "14px", fontWeight: 600 }}>
                 Data Configuration

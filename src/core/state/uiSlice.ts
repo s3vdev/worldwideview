@@ -22,9 +22,11 @@ export interface UISlice {
     hoveredEntity: GeoEntity | null;
     hoveredScreenPosition: { x: number; y: number } | null;
     lockedEntityId: string | null;
+    followEntityId: string | null;
     floatingStreams: FloatingStream[];
     activeConfigTab: "intel" | "filters" | "cache" | "overlay" | "apikeys";
     highlightLayerId: string | null;
+    openMobilePanel: "left" | "right" | null;
     toggleLeftSidebar: () => void;
     toggleRightSidebar: () => void;
     toggleConfigPanel: () => void;
@@ -32,12 +34,14 @@ export interface UISlice {
     setSelectedEntity: (entity: GeoEntity | null) => void;
     setHoveredEntity: (entity: GeoEntity | null, screenPos?: { x: number; y: number } | null) => void;
     setLockedEntityId: (id: string | null) => void;
+    setFollowEntityId: (id: string | null) => void;
     addFloatingStream: (stream: Omit<FloatingStream, "position" | "size">) => void;
     removeFloatingStream: (id: string) => void;
     updateFloatingStream: (id: string, updates: Partial<FloatingStream>) => void;
     setActiveConfigTab: (tab: "intel" | "filters" | "cache" | "overlay" | "apikeys") => void;
     setHighlightLayerId: (id: string | null) => void;
     setConfigPanelOpen: (open: boolean) => void;
+    setOpenMobilePanel: (panel: "left" | "right" | null) => void;
 }
 
 export const createUISlice: StateCreator<AppStore, [], [], UISlice> = (set) => ({
@@ -49,9 +53,11 @@ export const createUISlice: StateCreator<AppStore, [], [], UISlice> = (set) => (
     hoveredEntity: null,
     hoveredScreenPosition: null,
     lockedEntityId: null,
+    followEntityId: null,
     floatingStreams: [],
     activeConfigTab: "filters",
     highlightLayerId: null,
+    openMobilePanel: null,
     toggleLeftSidebar: () =>
         set((state) => ({ leftSidebarOpen: !state.leftSidebarOpen })),
     toggleRightSidebar: () =>
@@ -71,6 +77,8 @@ export const createUISlice: StateCreator<AppStore, [], [], UISlice> = (set) => (
         set({ hoveredEntity: entity, hoveredScreenPosition: screenPos ?? null }),
     setLockedEntityId: (id) =>
         set({ lockedEntityId: id }),
+    setFollowEntityId: (id) =>
+        set({ followEntityId: id }),
     addFloatingStream: (stream) =>
         set((state) => {
             if (state.floatingStreams.find(s => s.id === stream.id)) return state;
@@ -96,5 +104,9 @@ export const createUISlice: StateCreator<AppStore, [], [], UISlice> = (set) => (
     setActiveConfigTab: (tab) => set({ activeConfigTab: tab }),
     setHighlightLayerId: (id) => set({ highlightLayerId: id }),
     setConfigPanelOpen: (open) => set({ configPanelOpen: open }),
+    setOpenMobilePanel: (panel) =>
+        set((state) => ({
+            openMobilePanel: state.openMobilePanel === panel ? null : panel,
+        })),
 });
 

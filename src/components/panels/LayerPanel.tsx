@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 
 import { useStore } from "@/core/state/store";
+import { useIsMobile } from "@/core/hooks/useIsMobile";
 import { pluginManager } from "@/core/plugins/PluginManager";
 import { ImageryPicker } from "./ImageryPicker";
 import { PluginIcon } from "@/components/common/PluginIcon";
@@ -11,7 +12,9 @@ import { FavoritesTab } from "./FavoritesTab";
 
 
 export function LayerPanel() {
+    const isMobile = useIsMobile();
     const leftSidebarOpen = useStore((s) => s.leftSidebarOpen);
+    const openMobilePanel = useStore((s) => s.openMobilePanel);
     const layers = useStore((s) => s.layers);
     const entitiesByPlugin = useStore((s) => s.entitiesByPlugin);
 
@@ -64,10 +67,11 @@ export function LayerPanel() {
 
     const [activeTab, setActiveTab] = useState<"layers" | "imagery" | "favorites">("layers");
 
+    const isLeftOpen = isMobile ? openMobilePanel === "left" : leftSidebarOpen;
+
     return (
         <aside
-            className={`sidebar sidebar--left glass-panel ${leftSidebarOpen ? "" : "sidebar--closed"
-                }`}
+            className={`sidebar sidebar--left glass-panel ${isMobile ? "sidebar--mobile" : ""} ${isLeftOpen ? "" : "sidebar--closed"}`}
         >
             <div className="sidebar__title">Data Sources</div>
 

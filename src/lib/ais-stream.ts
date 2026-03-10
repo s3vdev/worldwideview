@@ -32,8 +32,24 @@ function getState(): AisState {
     return g.__aisState;
 }
 
+/** Stale threshold: vessels with no update older than this are dropped from the returned list and removed from cache */
+const VESSEL_STALE_MS = 60 * 60 * 1000; // 1 hour
+
 export function getCachedVessels(): any[] {
-    return Array.from(getState().vesselCache.values());
+    const s = getState();
+    const now = Date.now();
+    const result: any[] = [];
+    const toDelete: number[] = [];
+    for (const [mmsi, v] of s.vesselCache.entries()) {
+        const ts = v.timestamp ? new Date(v.timestamp).getTime() : 0;
+        if (now - ts > VESSEL_STALE_MS) {
+            toDelete.push(mmsi);
+            continue;
+        }
+        result.push({ ...v, lastSeen: v.timestamp });
+    }
+    toDelete.forEach((mmsi) => s.vesselCache.delete(mmsi));
+    return result;
 }
 
 export function startAisStream(): void {
@@ -81,18 +97,31 @@ export function startAisStream(): void {
         s.ws?.send(JSON.stringify({
             APIKey: apiKey,
             BoundingBoxes: [[[-90, -180], [90, 180]]],
-            FilterMessageTypes: ['PositionReport'],
+            FilterMessageTypes: ['PositionReport', 'StaticDataReport'],
         }));
-        console.log('[AIS] Subscribed to PositionReport');
+        console.log('[AIS] Subscribed to PositionReport + StaticDataReport');
     };
 
     s.ws.onmessage = async (event) => {
         try {
-            // Native Node WebSocket returns Blob, not string
             const raw = event.data instanceof Blob
                 ? await event.data.text()
                 : String(event.data);
             const msg = JSON.parse(raw);
+
+            if (msg.MessageType === 'StaticDataReport') {
+                const staticMsg = msg.Message?.StaticDataReport ?? msg.Message;
+                const mmsi = staticMsg?.UserID;
+                const shipType = typeof staticMsg?.ShipType === "number" ? staticMsg.ShipType : undefined;
+                if (mmsi != null && shipType != null) {
+                    const existing = s.vesselCache.get(mmsi);
+                    if (existing) {
+                        s.vesselCache.set(mmsi, { ...existing, shipType });
+                    }
+                }
+                return;
+            }
+
             if (msg.MessageType !== 'PositionReport') return;
 
             const rpt = msg.Message.PositionReport;
@@ -101,10 +130,12 @@ export function startAisStream(): void {
 
             if (Math.abs(rpt.Latitude) > 90 || Math.abs(rpt.Longitude) > 180) return;
 
+            const existing = s.vesselCache.get(mmsi);
+            const shipType = typeof rpt.ShipType === "number" ? rpt.ShipType : (existing?.shipType ?? 0);
             s.vesselCache.set(mmsi, {
                 mmsi,
-                name: meta.ShipName?.trim() || `MMSI ${mmsi}`,
-                type: 'other',
+                name: meta.ShipName?.trim() || existing?.name || `MMSI ${mmsi}`,
+                shipType,
                 lat: rpt.Latitude,
                 lon: rpt.Longitude,
                 speed: rpt.Sog === 1023 ? 0 : rpt.Sog,

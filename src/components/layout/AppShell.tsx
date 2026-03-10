@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Header } from "./Header";
+import { BootOverlay } from "@/components/common/BootOverlay";
+import { useBootSequence } from "@/core/hooks/useBootSequence";
 import { LayerPanel } from "@/components/panels/LayerPanel";
 import { EntityInfoCard } from "@/components/panels/EntityInfoCard";
 import { DataConfigPanel } from "@/components/panels/DataConfig";
@@ -22,6 +24,9 @@ import { useStore } from "@/core/state/store";
 import { dataBus } from "@/core/data/DataBus";
 import { PanelToggleArrows } from "@/components/layout/PanelToggleArrows";
 import { FloatingVideoManager } from "@/components/video/FloatingVideoManager";
+import { useIsMobile } from "@/core/hooks/useIsMobile";
+import { MobileHudBar } from "./MobileHudBar";
+import { MobileCameraStats } from "./MobileCameraStats";
 import dynamic from "next/dynamic";
 
 // A small functional component strictly for subscribing to non-rendering state/events
@@ -81,14 +86,18 @@ const GlobeView = dynamic(() => import("@/core/globe/GlobeView"), {
     ),
 });
 
+const BOOT_FALLBACK_MS = 10000;
+
 export function AppShell() {
     const initLayer = useStore((s) => s.initLayer);
+    const isMobile = useIsMobile();
+    const boot = useBootSequence();
+    const bootStartedRef = useRef(false);
 
     useEffect(() => {
         const startPlatform = async () => {
             console.log("[AppShell] Initializing Platform...");
 
-            // 1. Register built-in plugins
             pluginRegistry.register(new AviationPlugin());
             pluginRegistry.register(new MaritimePlugin());
             pluginRegistry.register(new WildfirePlugin());
@@ -98,42 +107,60 @@ export function AppShell() {
             pluginRegistry.register(new EarthquakePlugin());
             pluginRegistry.register(new SatellitesPlugin());
 
-            // 2. Init PluginManager
             await pluginManager.init();
 
-            // 3. Register and init Layer state for all plugins
             for (const plugin of pluginRegistry.getAll()) {
                 await pluginManager.registerPlugin(plugin);
                 initLayer(plugin.id);
             }
 
-            console.log("[AppShell] Platform Ready.");
+            console.log("[AppShell] Platform Ready. Waiting for globe...");
         };
+
+        const unsubGlobe = dataBus.on("globeReady", () => {
+            if (bootStartedRef.current) return;
+            bootStartedRef.current = true;
+            console.log("[AppShell] Globe ready — starting boot sequence.");
+            boot.startBoot();
+        });
+
+        const fallbackTimer = setTimeout(() => {
+            if (bootStartedRef.current) return;
+            bootStartedRef.current = true;
+            console.warn("[AppShell] Boot fallback: starting sequence after timeout.");
+            boot.startBoot();
+        }, BOOT_FALLBACK_MS);
 
         startPlatform();
 
         return () => {
+            unsubGlobe();
+            clearTimeout(fallbackTimer);
+            boot.cleanup();
             pluginManager.destroy();
         };
+        // startBoot/cleanup are stable; omit boot to avoid re-running when phase updates
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [initLayer]);
 
     return (
         <div className="app-shell">
-            {/* Background Globe */}
+            <BootOverlay visible={boot.phase === "loading"} />
+
             <div className="app-shell__globe">
                 <GlobeView />
             </div>
 
-            {/* Logic Syncs */}
             <TimelineSync />
             <DataBusSubscriber />
 
-            {/* Foreground UI Components */}
-            <PanelToggleArrows />
             <Header />
+            {isMobile && <MobileHudBar />}
+            {isMobile && <MobileCameraStats />}
+            <PanelToggleArrows />
             <LayerPanel />
             <DataConfigPanel />
-            <CameraStatsPanel />
+            {!isMobile && <CameraStatsPanel />}
             <EntityInfoCard />
             <Timeline />
             <FloatingVideoManager />

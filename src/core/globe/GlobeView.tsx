@@ -16,6 +16,7 @@ import type { GeoEntity, CesiumEntityOptions } from "@/core/plugins/PluginTypes"
 import { applyFilters } from "@/core/filters/filterEngine";
 import { subscribeToCameraPresets } from "./CameraController";
 import { setupInteractionHandlers } from "./InteractionHandler";
+import { dataBus } from "@/core/data/DataBus";
 import { useBorders } from "./useBorders";
 import { initPrimitiveCollections, AnimatableItem } from "./EntityRenderer";
 import { handleEntitySelection, cleanupTrail } from "./SelectionHandler";
@@ -25,6 +26,7 @@ import { useImageryManager } from "./useImageryManager";
 import { useCameraActions } from "./hooks/useCameraActions";
 import { useSelectionAnchor } from "./hooks/useSelectionAnchor";
 import { useCameraSync } from "./hooks/useCameraSync";
+import { useFollowCamera } from "./hooks/useFollowCamera";
 import { useEntityRendering } from "./hooks/useEntityRendering";
 import { useModelRendering } from "./hooks/useModelRendering";
 import { useFrustumRendering } from "./hooks/useFrustumRendering";
@@ -123,6 +125,7 @@ export default function GlobeView() {
     useSelectionAnchor(viewerRef.current, viewerReady, selectedEntity, selectionEntityRef, animatablesMapRef);
     useCameraSync(viewerRef.current, viewerReady, setCameraPosition, setFps);
     useCameraActions(viewerRef.current, viewerReady);
+    useFollowCamera(viewerRef.current, viewerReady);
     // All entities go through billboard/point pipeline (including model-type as fallback)
     useEntityRendering(viewerRef.current, viewerReady, visibleEntities, animatablesMapRef, hoveredEntityIdRef, sceneSettings);
     // LOD: promote nearby model-type entities to 3D models, hiding their billboard
@@ -169,6 +172,7 @@ export default function GlobeView() {
         initPrimitiveCollections(viewer);
         viewer.camera.setView({ destination: Cartesian3.fromDegrees(0, 20, 20000000) });
         setViewerReady(true);
+        dataBus.emit("globeReady", {});
     }, [sceneSettings]);
 
     // Entity selection → fly-to + trail

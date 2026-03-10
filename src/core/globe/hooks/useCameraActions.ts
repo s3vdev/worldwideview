@@ -109,6 +109,9 @@ export function useCameraActions(viewer: CesiumViewer | null, isReady: boolean) 
                     destination: destination,
                     orientation: orientation,
                     duration: 1.5,
+                    complete: () => {
+                        dataBus.emit("showLocationPin", {});
+                    },
                 });
             }, 50);
         });

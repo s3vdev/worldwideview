@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { Header } from "./Header";
 import { BootOverlay } from "@/components/common/BootOverlay";
+import { LocationPinOverlay } from "@/components/common/LocationPinOverlay";
 import { useBootSequence } from "@/core/hooks/useBootSequence";
 import { LayerPanel } from "@/components/panels/LayerPanel";
 import { EntityInfoCard } from "@/components/panels/EntityInfoCard";
@@ -164,6 +165,7 @@ export function AppShell() {
             <EntityInfoCard />
             <Timeline />
             <FloatingVideoManager />
+            <LocationPinOverlay />
         </div>
     );
 }

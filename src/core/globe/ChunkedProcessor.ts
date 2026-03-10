@@ -57,8 +57,8 @@ export class ChunkedProcessor {
             };
 
             const scheduleNext = () => {
-                if (typeof window !== "undefined" && window.requestIdleCallback) {
-                    window.requestIdleCallback(processNextChunk);
+                if (typeof window !== "undefined" && window.requestAnimationFrame) {
+                    window.requestAnimationFrame(() => processNextChunk());
                 } else {
                     setTimeout(() => processNextChunk(), 0);
                 }

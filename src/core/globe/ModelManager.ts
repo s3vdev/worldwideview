@@ -32,7 +32,8 @@ export async function createModelPrimitive(
     pendingLoads.add(entity.id);
 
     try {
-        const headingRad = entity.heading ? CesiumMath.toRadians(entity.heading) : 0;
+        const offset = options.modelHeadingOffset || 0;
+        const headingRad = CesiumMath.toRadians((entity.heading || 0) + offset);
         const hpr = new HeadingPitchRoll(headingRad, 0, 0);
         const modelMatrix = Transforms.headingPitchRollToFixedFrame(posRef, hpr);
 
@@ -73,7 +74,8 @@ export function updateModelTransform(
     const model = item.primitive;
     if (!model || !model.modelMatrix) return;
 
-    const headingRad = heading ? CesiumMath.toRadians(heading) : 0;
+    const offset = item.options.modelHeadingOffset || 0;
+    const headingRad = CesiumMath.toRadians((heading || 0) + offset);
     const hpr = new HeadingPitchRoll(headingRad, 0, 0);
     const newMatrix = Transforms.headingPitchRollToFixedFrame(position, hpr);
 

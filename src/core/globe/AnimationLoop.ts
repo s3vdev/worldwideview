@@ -14,6 +14,12 @@ import { getEntityColor, createLabel, removeLabel, type AnimatableItem } from ".
 import { updateModelTransform } from "./ModelManager";
 import { pluginManager } from "@/core/plugins/PluginManager";
 
+/** Touch-friendly default point size: larger on mobile (coarse pointer). */
+function defaultPointSize(): number {
+    if (typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches) return 12;
+    return 8;
+}
+
 const HIGHLIGHT_COLOR_SELECTED = Color.fromCssColorString("#00fff7");
 const HIGHLIGHT_COLOR_HOVERED = Color.YELLOW;
 
@@ -70,8 +76,7 @@ export function createUpdateLoop(
             const isSelected = state.selectedEntity?.id === entity.id;
             const isHovered = hoveredEntityIdRef.current === entity.id;
 
-            // Skip if model hasn't loaded yet
-            if (!primitive) continue;
+            if (!primitive || primitive.isDestroyed?.()) continue;
 
             // 1. Frustum Culling
             scratchSphere.center = posRef;
@@ -81,7 +86,7 @@ export function createUpdateLoop(
 
             if (!inFrustum && !isSelected && !isHovered) {
                 if (primitive.show !== false) primitive.show = false;
-                if (item.labelPrimitive && item.labelPrimitive.show !== false) item.labelPrimitive.show = false;
+                if (item.labelPrimitive && !item.labelPrimitive.isDestroyed?.() && item.labelPrimitive.show !== false) item.labelPrimitive.show = false;
                 continue;
             }
 
@@ -93,28 +98,18 @@ export function createUpdateLoop(
 
             if (!isVisible && !isSelected && !isHovered) {
                 if (primitive.show !== false) primitive.show = false;
-                if (item.labelPrimitive && item.labelPrimitive.show !== false) item.labelPrimitive.show = false;
-                // If the entity is far away and not selected, we can destroy its label to save memory
-                if (item.labelPrimitive && labelsCollection) removeLabel(item, labelsCollection);
+                if (item.labelPrimitive && !item.labelPrimitive.isDestroyed?.() && item.labelPrimitive.show !== false) item.labelPrimitive.show = false;
+                if (item.labelPrimitive && !item.labelPrimitive.isDestroyed?.() && labelsCollection) removeLabel(item, labelsCollection);
                 continue;
             }
 
-            // Don't show billboard if LOD hook has promoted this item to a 3D model
-            if (item._modelPromoted) continue;
-
-            if (primitive.show !== true) primitive.show = true;
-
-            // 3. Position update: plugin-specific dynamics or linear extrapolation
-            // First, try plugin's getDynamicPosition() for custom physics/movement
+            // 3. Position update for all (including promoted 3D models) so interpolation stays smooth
             const managed = pluginManager.getPlugin(entity.pluginId);
             let positionUpdated = false;
-            
             if (managed?.plugin.getDynamicPosition) {
-                // Plugin provides custom movement logic (e.g., orbital propagation, ballistic trajectory)
                 try {
                     const updatedPos = managed.plugin.getDynamicPosition(entity, new Date(nowMs));
                     if (updatedPos) {
-                        // Convert lat/lon/alt to Cartesian3
                         Cartesian3.fromDegrees(
                             updatedPos.longitude,
                             updatedPos.latitude,
@@ -122,27 +117,25 @@ export function createUpdateLoop(
                             Ellipsoid.WGS84,
                             posRef
                         );
-                        item.primitive.position = posRef;
-                        if (item.labelPrimitive) item.labelPrimitive.position = posRef;
+                        if (!primitive.isDestroyed?.()) primitive.position = posRef;
+                        if (item.labelPrimitive && !item.labelPrimitive.isDestroyed?.()) item.labelPrimitive.position = posRef;
                         positionUpdated = true;
                     }
                 } catch (err) {
                     console.warn(`[AnimationLoop] getDynamicPosition failed for ${entity.id}:`, err);
                 }
             }
-            
-            // Fallback to linear extrapolation for aircraft, ships, etc.
             if (!positionUpdated && entity.timestamp && entity.speed !== undefined && entity.heading !== undefined) {
                 const needsExtrapolation = entity.speed > 0 || isSelected || isHovered || isFullUpdate;
-                
                 if (needsExtrapolation) {
                     extrapolatePosition(item, nowMs);
-                    // Update model transform after extrapolation
-                    if (isModel) {
-                        updateModelTransform(item, item.posRef, entity.heading);
-                    }
+                    if (isModel) updateModelTransform(item, item.posRef, entity.heading);
                 }
             }
+
+            if (item._modelPromoted) continue;
+
+            if (primitive.show !== true) primitive.show = true;
 
             // 4. Highlight styling (skip for models — they use silhouette instead)
             if (!isModel) {
@@ -166,7 +159,7 @@ export function createUpdateLoop(
                     // Create if missing and should be shown
                     createLabel(item, labelsCollection);
                 }
-                if (item.labelPrimitive) {
+                if (item.labelPrimitive && !item.labelPrimitive.isDestroyed?.()) {
                     if (item.labelPrimitive.show !== true) item.labelPrimitive.show = true;
                     const targetFillColor = isSelected ? HIGHLIGHT_COLOR_SELECTED : Color.WHITE;
                     if (!Color.equals(item.labelPrimitive.fillColor, targetFillColor)) {
@@ -174,9 +167,8 @@ export function createUpdateLoop(
                     }
                 }
             } else {
-                if (item.labelPrimitive) {
+                if (item.labelPrimitive && !item.labelPrimitive.isDestroyed?.()) {
                     if (item.labelPrimitive.show !== false) item.labelPrimitive.show = false;
-                    // Proactively clean up hidden labels to save memory, they will be recreated if camera zooms back in
                     if (labelsCollection) removeLabel(item, labelsCollection);
                 }
             }
@@ -216,21 +208,19 @@ function extrapolatePosition(item: AnimatableItem, nowMs: number): void {
         item.velocityVector = Cartesian3.clone(scratchVelocity);
     }
 
-    // If static, only set position once
     if (entity.speed === 0) {
-        if (item.primitive.position !== posRef) {
+        if (item.primitive && !item.primitive.isDestroyed?.() && item.primitive.position !== posRef) {
             item.primitive.position = posRef;
-            if (item.labelPrimitive) item.labelPrimitive.position = posRef;
+            if (item.labelPrimitive && !item.labelPrimitive.isDestroyed?.()) item.labelPrimitive.position = posRef;
         }
         return;
     }
 
-    // Apply zero-allocation displacement calculation
     Cartesian3.multiplyByScalar(item.velocityVector, dtSec, scratchDisplacement);
     Cartesian3.add(item.basePosition!, scratchDisplacement, posRef);
 
-    item.primitive.position = posRef;
-    if (item.labelPrimitive) item.labelPrimitive.position = posRef;
+    if (item.primitive && !item.primitive.isDestroyed?.()) item.primitive.position = posRef;
+    if (item.labelPrimitive && !item.labelPrimitive.isDestroyed?.()) item.labelPrimitive.position = posRef;
 }
 
 /** Apply selected/hovered/normal highlight styling. */
@@ -251,7 +241,7 @@ function applyHighlight(item: AnimatableItem, isSelected: boolean, isHovered: bo
             const baseScale = options.size ? options.size / 24 : 0.5;
             primitive.scale = baseScale * 1.4; // 40% larger when selected
         } else {
-            primitive.pixelSize = (options.size || 6) * 2.0;
+            primitive.pixelSize = (options.size || defaultPointSize()) * 2.0;
             primitive.outlineColor = HIGHLIGHT_COLOR_SELECTED;
             primitive.outlineWidth = 3;
         }
@@ -273,7 +263,7 @@ function applyHighlight(item: AnimatableItem, isSelected: boolean, isHovered: bo
             const baseScale = options.size ? options.size / 24 : 0.5;
             primitive.scale = baseScale;
         } else {
-            primitive.pixelSize = options.size || 6;
+            primitive.pixelSize = options.size || defaultPointSize();
             primitive.outlineColor = item.baseOutlineColor;
             primitive.outlineWidth = options.outlineWidth || 1;
         }

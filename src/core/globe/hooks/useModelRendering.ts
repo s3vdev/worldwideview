@@ -31,8 +31,8 @@ interface ActiveModel {
     distance: number;
 }
 
-function buildModelMatrix(position: Cartesian3, heading: number, scale: number): Matrix4 {
-    const hpr = new HeadingPitchRoll(CesiumMath.toRadians(heading), 0, 0);
+function buildModelMatrix(position: Cartesian3, heading: number, scale: number, headingOffset: number = 0): Matrix4 {
+    const hpr = new HeadingPitchRoll(CesiumMath.toRadians(heading + headingOffset), 0, 0);
     const matrix = Transforms.headingPitchRollToFixedFrame(position, hpr);
     Matrix4.multiplyByUniformScale(matrix, scale, matrix);
     return matrix;
@@ -93,11 +93,11 @@ export function useModelRendering(
                 const pos = item.posRef;
                 const heading = item.entity.heading || 0;
                 const scale = item.options.modelScale || 1.0;
+                const offset = item.options.modelHeadingOffset || 0;
 
                 const existing = activeModels.get(id);
                 if (existing) {
-                    // Update transform
-                    const newMatrix = buildModelMatrix(pos, heading, scale);
+                    const newMatrix = buildModelMatrix(pos, heading, scale, offset);
                     Matrix4.clone(newMatrix, existing.model.modelMatrix);
                     existing.distance = distance;
                     // Keep billboard hidden via flag
@@ -120,7 +120,7 @@ export function useModelRendering(
 
                 Model.fromGltfAsync({
                     url: item.options.modelUrl!,
-                    modelMatrix: buildModelMatrix(pos, heading, scale),
+                    modelMatrix: buildModelMatrix(pos, heading, scale, offset),
                     minimumPixelSize: item.options.modelMinPixelSize ?? 24,
                     maximumScale: scale * 5,
                     color: item.options.color ? Color.fromCssColorString(item.options.color) : undefined,

@@ -379,6 +379,7 @@ export class AviationPlugin implements WorldPlugin {
             modelUrl: "/airplane/scene.gltf",
             modelScale: 75,
             modelMinPixelSize: 16,
+            modelHeadingOffset: 180,
             color: altitudeToColor(alt, isMilitary),
             rotation: entity.heading,
             labelText: entity.label || undefined,

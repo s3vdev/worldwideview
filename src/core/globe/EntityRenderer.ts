@@ -16,6 +16,12 @@ import type { Viewer as CesiumViewer } from "cesium";
 import type { GeoEntity, CesiumEntityOptions } from "@/core/plugins/PluginTypes";
 import { useStore } from "@/core/state/store";
 
+/** Touch-friendly default point size: larger on mobile (coarse pointer). */
+function defaultPointSize(): number {
+    if (typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches) return 12;
+    return 8;
+}
+
 export interface AnimatableItem {
     primitive: any;
     labelPrimitive?: any;
@@ -173,7 +179,7 @@ function renderSingleEntity(
             const newScale = options.size ? options.size / 24 : 0.5;
             if (item.primitive.scale !== newScale) item.primitive.scale = newScale;
         } else {
-            const newSize = options.size || 6;
+            const newSize = options.size || defaultPointSize();
             const newOutlineWidth = options.outlineWidth || 1;
 
             if (item.primitive.pixelSize !== newSize) item.primitive.pixelSize = newSize;
@@ -196,7 +202,7 @@ function renderSingleEntity(
             });
         } else {
             addedPrimitive = points.add({
-                position, pixelSize: options.size || 6, color,
+                position, pixelSize: options.size || defaultPointSize(), color,
                 outlineColor: options.outlineColor ? Color.fromCssColorString(options.outlineColor) : Color.BLACK,
                 outlineWidth: options.outlineWidth || 1,
                 scaleByDistance: new NearFarScalar(1e3, 1.0, 1e7, 0.4), id: clickId,
@@ -267,7 +273,7 @@ export async function renderEntitiesChunked(
 
     await globalChunkedProcessor.processChunked(
         visibleEntities,
-        500, // Process 500 items per chunk
+        1000, // Process 1000 items per chunk
         (chunk) => {
             if (viewer.isDestroyed()) return;
             for (let i = 0; i < chunk.length; i++) {

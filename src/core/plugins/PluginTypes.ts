@@ -63,7 +63,9 @@ export interface CesiumEntityOptions {
     modelScale?: number;
     /** Minimum pixel size for the model (prevents vanishing at distance) */
     modelMinPixelSize?: number;
-    
+    /** Heading offset in degrees to correct model orientation (e.g. 180 to flip a backward model) */
+    modelHeadingOffset?: number;
+
     // ─── Ellipse Options (for type: "ellipse") ─────────────────
     /** Radius in meters for ellipse/circular area visualization */
     radiusMeters?: number;
@@ -254,6 +256,7 @@ export type DataBusEvents = {
     layerToggled: { pluginId: string; enabled: boolean };
     timeRangeChanged: { timeRange: TimeRange };
     globeReady: Record<string, never>;
+    showLocationPin: Record<string, never>;
     cameraPreset: { presetId: string };
     cameraFaceTowards: { lat: number; lon: number; alt: number };
     cameraGoTo: { lat: number; lon: number; alt: number; distance?: number; maxPitch?: number; heading?: number };

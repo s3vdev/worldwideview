@@ -1,150 +1,379 @@
 import { NextResponse } from "next/server";
+import { cellToBoundary } from "h3-js";
+import { get, set, TTL } from "@/lib/serverCache";
 
 /**
- * GPS Jamming / GNSS Interference API Route (DEMO/FALLBACK ONLY)
- * 
- * ⚠️ WARNING: This endpoint returns STATIC DEMONSTRATION DATA, not live GPS jamming data.
- * 
- * Why No Live Data?
- * - GPSJAM (https://gpsjam.org/) provides NO machine-readable API
- * - Only visual map interface available (web scraping unreliable/against ToS)
- * - Real-time GPS interference detection requires:
- *   a) ADS-B Exchange commercial API access, or
- *   b) Direct ADS-B receiver infrastructure, or
- *   c) Licensed GPS monitoring services
- * 
- * Current Implementation:
- * - Serves curated static hotspot data based on publicly reported interference zones
- * - Data based on conflict regions, aviation authority reports, and news sources
- * - NOT updated in real-time
- * 
- * Future Options:
- * 1. Contact GPSJAM creator for data access
- * 2. License commercial GPS interference data
- * 3. Replace with different plugin using real public API
+ * GPS Jamming / GNSS Interference API Route
+ *
+ * Data source: gpsjam.org (verified via browser network inspection).
+ * - Manifest: https://gpsjam.org/data/manifest.csv (date,suspect,num_bad_aircraft_hexes)
+ * - Daily data: https://gpsjam.org/data/{YYYY-MM-DD}-h3_4.csv (hex,count_good_aircraft,count_bad_aircraft)
+ *
+ * Date resolution: try manifest first for latest available date; if unavailable, try today, today-1, today-2, today-3.
+ * Caching: manifest 30 min, daily CSV 4 h; failed fetches cached briefly to avoid hammering.
+ * No dummy/fallback data; empty polygons with debug if no valid dataset.
  */
 
-interface GPSJammingDataPoint {
+const GPSJAM_BASE = "https://gpsjam.org/data";
+const MANIFEST_URL = `${GPSJAM_BASE}/manifest.csv`;
+const USER_AGENT = "Mozilla/5.0 (compatible; WorldwideView/1.0; +https://github.com/worldwideview)";
+const MAX_POLYGONS = 2000;
+const CACHE_KEY_MANIFEST = "gpsjam:manifest";
+const LOOKBACK_DAYS = 3; // fallback: today, today-1, ... today-LOOKBACK_DAYS
+
+export interface GpsJammingPolygon {
     id: string;
-    latitude: number;
-    longitude: number;
     severity: "low" | "medium" | "high";
     affectedPercent: number;
+    positions: Array<{ latitude: number; longitude: number; altitude?: number }>;
     timestamp: string;
-    region?: string;
 }
 
-/**
- * Generates static demonstration GPS jamming data based on known hotspots
- * 
- * ⚠️ THIS IS NOT LIVE DATA - Static coordinates from public reports
- * 
- * Sources for hotspot identification:
- * - Aviation authority GPS interference reports
- * - Conflict zone analysis (Ukraine, Syria, etc.)
- * - Public GNSS interference incident databases
- * - News reports and flight tracking anomalies
- * 
- * Note: Real GPSJAM data is not machine-accessible without web scraping
- */
-function generateFallbackData(): GPSJammingDataPoint[] {
-    const timestamp = new Date().toISOString();
-    
-    // Known GPS jamming hotspots based on publicly reported regions
-    const hotspots = [
-        // Eastern Europe / Ukraine conflict zone
-        { lat: 50.45, lon: 30.52, severity: "high" as const, percent: 25, region: "Eastern Europe" },
-        { lat: 47.91, lon: 33.38, severity: "high" as const, percent: 18, region: "Black Sea" },
-        { lat: 46.48, lon: 30.73, severity: "medium" as const, percent: 8, region: "Ukraine South" },
-        
-        // Baltic Sea region
-        { lat: 54.68, lon: 25.28, severity: "medium" as const, percent: 7, region: "Baltic States" },
-        { lat: 59.44, lon: 24.75, severity: "medium" as const, percent: 9, region: "Estonia" },
-        
-        // Middle East
-        { lat: 33.51, lon: 36.29, severity: "high" as const, percent: 22, region: "Syria" },
-        { lat: 31.77, lon: 35.21, severity: "medium" as const, percent: 6, region: "Israel/Palestine" },
-        { lat: 33.31, lon: 44.36, severity: "medium" as const, percent: 5, region: "Iraq" },
-        
-        // Russia border regions
-        { lat: 55.75, lon: 37.62, severity: "low" as const, percent: 3, region: "Moscow vicinity" },
-        { lat: 59.93, lon: 30.36, severity: "low" as const, percent: 4, region: "St. Petersburg" },
-        
-        // Eastern Mediterranean
-        { lat: 35.13, lon: 33.35, severity: "medium" as const, percent: 8, region: "Cyprus" },
-        
-        // Caucasus
-        { lat: 42.00, lon: 43.50, severity: "medium" as const, percent: 7, region: "Georgia" },
-        
-        // Additional sporadic incidents
-        { lat: 52.37, lon: 4.89, severity: "low" as const, percent: 2, region: "Netherlands" },
-        { lat: 51.51, lon: -0.13, severity: "low" as const, percent: 1, region: "UK" },
-    ];
-
-    return hotspots.map((spot, idx) => ({
-        id: `fallback-${idx}`,
-        latitude: spot.lat,
-        longitude: spot.lon,
-        severity: spot.severity,
-        affectedPercent: spot.percent,
-        timestamp,
-        region: spot.region,
-    }));
+export interface GpsJammingDebug {
+    source: "gpsjam-real" | "gpsjam-unavailable";
+    requestedDate: string;
+    resolvedDate: string | null;
+    manifestUsed: boolean;
+    cacheHit: boolean;
+    cacheKey: string | null;
+    fetchAttempts: string[];
+    sourceUrlTried: string[];
+    finalUrlUsed: string | null;
+    urlUsed?: string;
+    contentType: string;
+    dateUsed?: string;
+    rawRecordCount: number;
+    polygonCount: number;
+    format: "csv";
+    usedTransformation: boolean;
+    notes: string[];
 }
 
-/**
- * Attempts to fetch real data from GPSJAM
- * 
- * ⚠️ Currently always returns null - GPSJAM has no public API
- * 
- * This function is a placeholder for future integration if:
- * - GPSJAM creates a public API
- * - Commercial data licensing is secured
- * - Alternative real-time source is found
- */
-async function fetchGPSJamData(): Promise<GPSJammingDataPoint[] | null> {
+/** GPSJAM formula: percent_bad = 100 * (bad - 1) / (good + bad); subtract 1 from bad to limit false positives */
+function computePercentBad(countGood: number, countBad: number): number {
+    if (countBad <= 0) return 0;
+    const badAdjusted = Math.max(0, countBad - 1);
+    const total = countGood + countBad;
+    if (total <= 0) return 0;
+    return (100 * badAdjusted) / total;
+}
+
+/** Severity from percent (GPSJAM: green <2%, yellow 2-10%, red >10%). We only emit yellow/red for interference. */
+function percentToSeverity(percent: number): "low" | "medium" | "high" {
+    if (percent > 10) return "high";
+    if (percent >= 2) return "medium";
+    return "low";
+}
+
+/** Parse CSV line; handle quoted fields if needed */
+function parseCsvLine(line: string): string[] {
+    const out: string[] = [];
+    let cur = "";
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (c === '"') {
+            inQuotes = !inQuotes;
+        } else if ((c === "," && !inQuotes) || (c === "\r" && !inQuotes)) {
+            out.push(cur.trim());
+            cur = "";
+        } else if (c !== "\r") {
+            cur += c;
+        }
+    }
+    out.push(cur.trim());
+    return out;
+}
+
+/** Fetch manifest.csv and return latest available date (YYYY-MM-DD) or null. Successful result cached 30 min. */
+async function fetchLatestDateFromManifest(
+    fetchAttempts: string[],
+    sourceUrlTried: string[]
+): Promise<{ latestDate: string | null; manifestUsed: boolean }> {
+    const cached = get<string>(CACHE_KEY_MANIFEST);
+    if (cached != null && cached !== "") {
+        fetchAttempts.push("manifest(cached)");
+        sourceUrlTried.push(MANIFEST_URL + " (cached)");
+        return { latestDate: cached, manifestUsed: true };
+    }
+
+    fetchAttempts.push("manifest");
+    sourceUrlTried.push(MANIFEST_URL);
+
+    const res = await fetch(MANIFEST_URL, {
+        cache: "no-store",
+        headers: { Accept: "text/csv, text/plain, */*", "User-Agent": USER_AGENT },
+    });
+    if (!res.ok) return { latestDate: null, manifestUsed: false };
+    const text = await res.text();
+    const lines = text.split("\n").filter((l) => l.trim());
+    if (lines.length < 2) return { latestDate: null, manifestUsed: false };
+    const header = parseCsvLine(lines[0]);
+    const dateIdx = header.indexOf("date");
+    if (dateIdx < 0) return { latestDate: null, manifestUsed: false };
+    const dates: string[] = [];
+    for (let i = 1; i < lines.length; i++) {
+        const parts = parseCsvLine(lines[i]);
+        const d = parts[dateIdx]?.trim();
+        if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) dates.push(d);
+    }
+    if (dates.length === 0) return { latestDate: null, manifestUsed: false };
+    const latestDate = dates.sort().reverse()[0];
+    set(CACHE_KEY_MANIFEST, latestDate, TTL.MANIFEST_MS);
+    return { latestDate, manifestUsed: true };
+}
+
+/** Generate fallback dates: [today, today-1, ... today-lookback] in UTC */
+function getFallbackDates(requestedDate: string, lookback: number): string[] {
+    const base = new Date(requestedDate + "T12:00:00Z");
+    const out: string[] = [];
+    for (let i = 0; i <= lookback; i++) {
+        const d = new Date(base);
+        d.setUTCDate(d.getUTCDate() - i);
+        out.push(d.toISOString().slice(0, 10));
+    }
+    return out;
+}
+
+type CsvResult = { rows: Array<{ hex: string; countGood: number; countBad: number }>; contentType: string };
+
+/** Fetch and parse daily CSV; return rows or null on failure. Does not use cache (caller caches). */
+async function fetchDailyCsvUncached(dateStr: string): Promise<CsvResult | null> {
+    const url = `${GPSJAM_BASE}/${dateStr}-h3_4.csv`;
+    const res = await fetch(url, {
+        cache: "no-store",
+        headers: { Accept: "text/csv, text/plain, */*", "User-Agent": USER_AGENT },
+    });
+    const contentType = res.headers.get("content-type") ?? "unknown";
+    if (!res.ok) return null;
+    const text = await res.text();
+    const lines = text.split("\n").filter((l) => l.trim());
+    if (lines.length < 2) return { rows: [], contentType };
+    const header = parseCsvLine(lines[0]);
+    const hexIdx = header.indexOf("hex");
+    const goodIdx = header.indexOf("count_good_aircraft");
+    const badIdx = header.indexOf("count_bad_aircraft");
+    if (hexIdx < 0 || goodIdx < 0 || badIdx < 0) return { rows: [], contentType };
+    const rows: Array<{ hex: string; countGood: number; countBad: number }> = [];
+    for (let i = 1; i < lines.length; i++) {
+        const parts = parseCsvLine(lines[i]);
+        const hex = parts[hexIdx] ?? "";
+        const countGood = parseInt(parts[goodIdx] ?? "0", 10) || 0;
+        const countBad = parseInt(parts[badIdx] ?? "0", 10) || 0;
+        if (hex) rows.push({ hex, countGood, countBad });
+    }
+    return { rows, contentType };
+}
+
+/** Convert H3 index to polygon positions (closed ring). */
+function h3ToPositions(hex: string): Array<{ latitude: number; longitude: number; altitude?: number }> | null {
     try {
-        // GPSJAM does NOT provide a machine-readable API endpoint
-        // Only option would be web scraping their map tiles, which is:
-        // - Unreliable (changes to frontend break scraper)
-        // - Potentially against Terms of Service
-        // - Not suitable for production use
-        
-        console.log("[GPS Jamming API] ⚠️ No live data source available - GPSJAM has no public API");
-        return null;
-    } catch (err) {
-        console.error("[GPS Jamming API] Error fetching data:", err);
+        const boundary = cellToBoundary(hex, false) as [number, number][];
+        if (!boundary || boundary.length < 3) return null;
+        return boundary.map(([lat, lng]) => ({ latitude: lat, longitude: lng, altitude: 0 }));
+    } catch {
         return null;
     }
 }
 
-export async function GET() {
+function clampTtl(ms: number): number {
+    if (ms <= 0) return 0;
+    return Math.min(24 * 60 * 60 * 1000, Math.max(5 * 60 * 1000, ms));
+}
+
+export async function GET(request: Request) {
+    const url = new URL(request.url);
+    const requestedDate = url.searchParams.get("date") ?? new Date().toISOString().slice(0, 10);
+    const cacheMaxAgeParam = url.searchParams.get("cacheMaxAgeMs");
+    const cacheTtlMs = clampTtl(cacheMaxAgeParam ? parseInt(cacheMaxAgeParam, 10) : 4 * 60 * 60 * 1000);
+    const useResponseCache = cacheTtlMs > 0;
+    const notes: string[] = [];
+    const fetchAttempts: string[] = [];
+    const sourceUrlTried: string[] = [];
+
     try {
-        // Attempt to fetch real data
-        let data = await fetchGPSJamData();
-        
-        // Use fallback demonstration data if real source unavailable
-        if (!data) {
-            console.warn("[GPS Jamming API] ⚠️ Using STATIC DEMO DATA - not live GPS jamming feed");
-            data = generateFallbackData();
+        let resolvedDate: string | null = null;
+        let manifestUsed = false;
+        let cacheHit = false;
+        let cacheKey: string | null = null;
+        let finalUrlUsed: string | null = null;
+        let result: CsvResult | null = null;
+
+        // 1) Try manifest for latest available date
+        const manifestResult = await fetchLatestDateFromManifest(fetchAttempts, sourceUrlTried);
+        manifestUsed = manifestResult.manifestUsed;
+        if (manifestResult.latestDate) {
+            resolvedDate = manifestResult.latestDate;
+            cacheKey = `gpsjam:csv:${resolvedDate}`;
+            const cached = get<CsvResult>(cacheKey);
+            if (cached) {
+                cacheHit = true;
+                result = cached;
+                finalUrlUsed = `${GPSJAM_BASE}/${resolvedDate}-h3_4.csv`;
+                fetchAttempts.push(`${resolvedDate}(cached)`);
+                sourceUrlTried.push(`${GPSJAM_BASE}/${resolvedDate}-h3_4.csv (cached)`);
+            } else {
+                fetchAttempts.push(resolvedDate);
+                sourceUrlTried.push(`${GPSJAM_BASE}/${resolvedDate}-h3_4.csv`);
+                result = await fetchDailyCsvUncached(resolvedDate);
+                if (result && result.rows.length > 0) {
+                    set(cacheKey, result, TTL.DAILY_MS);
+                    finalUrlUsed = `${GPSJAM_BASE}/${resolvedDate}-h3_4.csv`;
+                } else {
+                    set(`gpsjam:fail:${resolvedDate}`, true, TTL.NEGATIVE_MS);
+                    result = null;
+                }
+            }
         }
 
-        return NextResponse.json({
-            dataPoints: data,
-            timestamp: new Date().toISOString(),
-            source: "DEMO - Static Hotspot Data (Not Live)",
-            updateInterval: "N/A (static data)",
-            note: "⚠️ DEMONSTRATION DATA ONLY. GPSJAM provides no machine-readable API. Data represents known hotspots from public reports, not real-time interference.",
-            disclaimer: "This is NOT live GPS jamming data. For actual interference monitoring, contact aviation authorities or license commercial GPS monitoring services.",
-        });
+        // 2) Fallback: try requested date and then lookback days
+        if (!result) {
+            const candidates = getFallbackDates(requestedDate, LOOKBACK_DAYS);
+            for (const dateStr of candidates) {
+                if (resolvedDate === dateStr) continue; // already tried
+                cacheKey = `gpsjam:csv:${dateStr}`;
+                const cached = get<CsvResult>(cacheKey);
+                if (cached) {
+                    cacheHit = true;
+                    result = cached;
+                    resolvedDate = dateStr;
+                    finalUrlUsed = `${GPSJAM_BASE}/${dateStr}-h3_4.csv`;
+                    fetchAttempts.push(`${dateStr}(cached)`);
+                    sourceUrlTried.push(`${GPSJAM_BASE}/${dateStr}-h3_4.csv (cached)`);
+                    break;
+                }
+                fetchAttempts.push(dateStr);
+                sourceUrlTried.push(`${GPSJAM_BASE}/${dateStr}-h3_4.csv`);
+                const fetched = await fetchDailyCsvUncached(dateStr);
+                if (fetched && fetched.rows.length > 0) {
+                    set(cacheKey, fetched, TTL.DAILY_MS);
+                    result = fetched;
+                    resolvedDate = dateStr;
+                    finalUrlUsed = `${GPSJAM_BASE}/${dateStr}-h3_4.csv`;
+                    break;
+                }
+                set(`gpsjam:fail:${dateStr}`, true, TTL.NEGATIVE_MS);
+            }
+        }
+
+        if (!result || !resolvedDate) {
+            const debug: GpsJammingDebug = {
+                source: "gpsjam-unavailable",
+                requestedDate,
+                resolvedDate: null,
+                manifestUsed,
+                cacheHit: false,
+                cacheKey: null,
+                fetchAttempts,
+                sourceUrlTried,
+                finalUrlUsed: null,
+                urlUsed: undefined,
+                dateUsed: undefined,
+                contentType: "none",
+                rawRecordCount: 0,
+                polygonCount: 0,
+                format: "csv",
+                usedTransformation: true,
+                notes: ["No valid dataset found. No fallback data used."],
+            };
+            return NextResponse.json({
+                polygons: [],
+                timestamp: new Date().toISOString(),
+                debug,
+            });
+        }
+
+        const responseCacheKey = `gpsjam:response:${resolvedDate}`;
+        if (useResponseCache) {
+            const cachedResponse = get<{ polygons: GpsJammingPolygon[]; timestamp: string; debug: GpsJammingDebug }>(responseCacheKey);
+            if (cachedResponse) return NextResponse.json(cachedResponse);
+        }
+
+        const { rows, contentType } = result;
+        notes.push(`Fetched ${rows.length} CSV rows for ${resolvedDate}`);
+
+        const timestamp = new Date().toISOString();
+        const polygons: GpsJammingPolygon[] = [];
+        let skippedInvalidHex = 0;
+        let skippedLowPercent = 0;
+
+        for (let i = 0; i < rows.length && polygons.length < MAX_POLYGONS; i++) {
+            const { hex, countGood, countBad } = rows[i];
+            const percent = computePercentBad(countGood, countBad);
+            const severity = percentToSeverity(percent);
+            if (percent < 2) {
+                skippedLowPercent++;
+                continue;
+            }
+            const positions = h3ToPositions(hex);
+            if (!positions) {
+                skippedInvalidHex++;
+                continue;
+            }
+            polygons.push({
+                id: `gpsjam-${hex}`,
+                severity,
+                affectedPercent: Math.round(percent * 10) / 10,
+                positions,
+                timestamp,
+            });
+        }
+
+        if (skippedInvalidHex) notes.push(`${skippedInvalidHex} rows skipped (invalid H3 index)`);
+        if (skippedLowPercent) notes.push(`${skippedLowPercent} rows skipped (percent < 2%)`);
+        if (polygons.length >= MAX_POLYGONS) notes.push(`Capped at ${MAX_POLYGONS} polygons`);
+
+        const debug: GpsJammingDebug = {
+            source: "gpsjam-real",
+            requestedDate,
+            resolvedDate,
+            manifestUsed,
+            cacheHit,
+            cacheKey,
+            fetchAttempts,
+            sourceUrlTried,
+            finalUrlUsed,
+            urlUsed: finalUrlUsed ?? undefined,
+            dateUsed: resolvedDate ?? undefined,
+            contentType,
+            rawRecordCount: rows.length,
+            polygonCount: polygons.length,
+            format: "csv",
+            usedTransformation: true,
+            notes,
+        };
+
+        const body = { polygons, timestamp, debug };
+        if (useResponseCache) set(responseCacheKey, body, cacheTtlMs);
+        return NextResponse.json(body);
     } catch (err) {
-        console.error("[GPS Jamming API] Unexpected error:", err);
+        const message = err instanceof Error ? err.message : String(err);
+        const debug: GpsJammingDebug = {
+            source: "gpsjam-unavailable",
+            requestedDate,
+            resolvedDate: null,
+            manifestUsed: false,
+            cacheHit: false,
+            cacheKey: null,
+            fetchAttempts,
+            sourceUrlTried,
+            finalUrlUsed: null,
+            urlUsed: undefined,
+            dateUsed: undefined,
+            contentType: "none",
+            rawRecordCount: 0,
+            polygonCount: 0,
+            format: "csv",
+            usedTransformation: false,
+            notes: [`Error: ${message}. No fallback data used.`],
+        };
         return NextResponse.json(
-            { 
-                error: "Failed to fetch GPS jamming data",
-                dataPoints: [],
+            {
+                polygons: [],
+                timestamp: new Date().toISOString(),
+                debug,
             },
-            { status: 500 }
+            { status: 200 }
         );
     }
 }

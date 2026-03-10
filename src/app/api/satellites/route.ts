@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { NextRequest } from "next/server";
+import { get, set } from "@/lib/serverCache";
 
 /**
  * Satellites API Route
@@ -10,8 +11,10 @@ import { NextRequest } from "next/server";
  * NO DEMO DATA - Real orbital data only
  * 
  * Query Parameters:
- *   - groups: comma-separated list of satellite groups (e.g., "stations,gps-ops,weather")
+ *   - groups: comma-separated list of satellite groups (default: all 9 groups)
  *   - starlinkLimit: max number of Starlink satellites (default: 50)
+ *   - activeLimit: max number of Active satellites (default: 100)
+ *   - cacheMaxAgeMs: server cache TTL in ms (from Data Config → Cache & Limits; 0 = no cache)
  */
 
 // CelesTrak GP (General Perturbations) endpoint
@@ -19,8 +22,19 @@ const CELESTRAK_BASE_URL = "https://celestrak.org/NORAD/elements/gp.php";
 
 /**
  * Available satellite groups from CelesTrak
+ * See https://celestrak.org/NORAD/elements/
  */
-const AVAILABLE_GROUPS = ["stations", "gps-ops", "weather", "starlink"] as const;
+const AVAILABLE_GROUPS = [
+    "stations",
+    "gps-ops",
+    "weather",
+    "starlink",
+    "oneweb",
+    "iridium",
+    "planet",
+    "military",
+    "active",
+] as const;
 
 export interface TLERecord {
     name: string;
@@ -35,17 +49,36 @@ export async function GET(request: NextRequest) {
         const { searchParams } = new URL(request.url);
         const groupsParam = searchParams.get("groups");
         const starlinkLimitParam = searchParams.get("starlinkLimit");
-        
-        // Determine which groups to fetch (default: stations, gps-ops, weather, starlink)
-        const requestedGroups = groupsParam 
-            ? groupsParam.split(",").filter(g => AVAILABLE_GROUPS.includes(g as any))
-            : ["stations", "gps-ops", "weather", "starlink"]; // Default: all groups including Starlink
-        
+        const activeLimitParam = searchParams.get("activeLimit");
+
+        const DEFAULT_GROUPS: string[] = [
+            "stations", "gps-ops", "weather", "starlink",
+            "oneweb", "iridium", "planet", "military", "active",
+        ];
+        const parsed = groupsParam
+            ? groupsParam.split(",").map((g) => g.trim().toLowerCase()).filter((g) => AVAILABLE_GROUPS.includes(g as any))
+            : [];
+        const requestedGroups = parsed.length > 0 ? parsed : DEFAULT_GROUPS;
+
         const starlinkLimit = starlinkLimitParam ? parseInt(starlinkLimitParam, 10) : 50;
-        
+        const activeLimit = activeLimitParam ? parseInt(activeLimitParam, 10) : 100;
+        const cacheMaxAgeParam = searchParams.get("cacheMaxAgeMs");
+        const requestedTtlMs = cacheMaxAgeParam ? parseInt(cacheMaxAgeParam, 10) : 30 * 60 * 1000;
+        const cacheTtlMs = requestedTtlMs <= 0 ? 0 : Math.min(24 * 60 * 60 * 1000, Math.max(5 * 60 * 1000, requestedTtlMs));
+
+        const cacheKey = `satellites:${[...requestedGroups].sort().join(",")}:${starlinkLimit}:${activeLimit}`;
+        if (cacheTtlMs > 0) {
+            const cached = get<{ tles: TLERecord[]; timestamp: string; source: string; requestedGroups: string[]; starlinkLimit: number; activeLimit: number; debug: object }>(cacheKey);
+            if (cached) {
+                const maxAgeSec = Math.floor(cacheTtlMs / 1000);
+                return NextResponse.json(cached, {
+                    headers: { "Cache-Control": `public, max-age=${maxAgeSec}, stale-while-revalidate=300` },
+                });
+            }
+        }
+
         console.log(`[Satellites API] Requested groups: ${requestedGroups.join(", ")}`);
-        console.log(`[Satellites API] Starlink limit: ${starlinkLimit}`);
-        console.log(`[Satellites API] Groups param: ${groupsParam}`);
+        console.log(`[Satellites API] Starlink limit: ${starlinkLimit}, Active limit: ${activeLimit}`);
 
         const allTLEs: TLERecord[] = [];
 
@@ -101,12 +134,15 @@ export async function GET(request: NextRequest) {
                     
                     // Validate TLE format (line1 starts with "1 ", line2 starts with "2 ")
                     if (line1.startsWith("1 ") && line2.startsWith("2 ")) {
-                        // Apply Starlink limit for performance
                         if (group === "starlink" && allTLEs.filter(t => t.group === "starlink").length >= starlinkLimit) {
                             skippedCount++;
                             continue;
                         }
-                        
+                        if (group === "active" && allTLEs.filter(t => t.group === "active").length >= activeLimit) {
+                            skippedCount++;
+                            continue;
+                        }
+
                         allTLEs.push({
                             name,
                             line1,
@@ -124,40 +160,54 @@ export async function GET(request: NextRequest) {
             }
         }
 
-        console.log(`[Satellites API] Total TLEs fetched: ${allTLEs.length}`);
+        // Per-group counts and debug (for initial load verification)
+        const countPerGroup: Record<string, number> = {};
+        for (const t of allTLEs) {
+            countPerGroup[t.group] = (countPerGroup[t.group] ?? 0) + 1;
+        }
+        const starlinkCount = countPerGroup["starlink"] ?? 0;
+        const activeCount = countPerGroup["active"] ?? 0;
+        const debug = {
+            requestedGroups: [...requestedGroups],
+            countPerGroup,
+            totalCount: allTLEs.length,
+            starlinkIncluded: requestedGroups.includes("starlink"),
+            starlinkLimitApplied: requestedGroups.includes("starlink") ? starlinkCount : null as number | null,
+            activeIncluded: requestedGroups.includes("active"),
+            activeLimitApplied: requestedGroups.includes("active") ? activeCount : null as number | null,
+        };
+        console.log(`[Satellites API] Total TLEs: ${allTLEs.length}`, JSON.stringify(countPerGroup));
 
         // If no data was fetched, return empty result with error (NO CACHING)
         if (allTLEs.length === 0) {
             console.error("[Satellites API] No satellite data available from CelesTrak");
             return NextResponse.json(
-                { 
+                {
                     tles: [],
                     timestamp: new Date().toISOString(),
                     source: "CelesTrak",
                     requestedGroups,
                     starlinkLimit,
-                    error: "No satellite data available from CelesTrak"
+                    debug: { ...debug, totalCount: 0 },
+                    error: "No satellite data available from CelesTrak",
                 }
-                // No caching for errors
             );
         }
 
-        // Return live TLE data WITH CACHING (30 minutes + stale-while-revalidate)
-        return NextResponse.json(
-            {
-                tles: allTLEs,
-                timestamp: new Date().toISOString(),
-                source: "CelesTrak",
-                requestedGroups,
-                starlinkLimit,
-            },
-            {
-                headers: {
-                    // Cache for 30 minutes, allow stale content for 5 minutes while revalidating
-                    "Cache-Control": "public, max-age=1800, stale-while-revalidate=300",
-                },
-            }
-        );
+        const body = {
+            tles: allTLEs,
+            timestamp: new Date().toISOString(),
+            source: "CelesTrak",
+            requestedGroups,
+            starlinkLimit,
+            activeLimit,
+            debug,
+        };
+        if (cacheTtlMs > 0) set(cacheKey, body, cacheTtlMs);
+        const maxAgeSec = cacheTtlMs > 0 ? Math.floor(cacheTtlMs / 1000) : 0;
+        return NextResponse.json(body, {
+            headers: { "Cache-Control": maxAgeSec > 0 ? `public, max-age=${maxAgeSec}, stale-while-revalidate=300` : "no-store" },
+        });
     } catch (err) {
         console.error("[Satellites API] Fetch error:", err);
         return NextResponse.json(

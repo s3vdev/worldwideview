@@ -4,6 +4,7 @@ import type { GeoEntity, CesiumEntityOptions } from "@/core/plugins/PluginTypes"
 import { renderEntitiesChunked, renderEntities, AnimatableItem } from "../EntityRenderer";
 import { ellipseEntityManager } from "../EllipseEntityManager";
 import { polylineEntityManager } from "../PolylineEntityManager";
+import { polygonEntityManager } from "../PolygonEntityManager";
 import { createUpdateLoop } from "../AnimationLoop";
 
 export function useEntityRendering(
@@ -52,6 +53,7 @@ export function useEntityRendering(
         
         // Initialize polyline manager with current viewer
         polylineEntityManager.setViewer(viewer);
+        polygonEntityManager.setViewer(viewer);
 
         // Sync scene settings
         viewer.scene.debugShowFramesPerSecond = sceneSettings.showFps;
@@ -68,14 +70,12 @@ export function useEntityRendering(
 
         // Separate entities by render type
         const primitiveEntities = visibleEntities.filter(e => 
-            e.options.type !== "ellipse" && e.options.type !== "polyline"
+            e.options.type !== "ellipse" && e.options.type !== "polyline" && e.options.type !== "polygon"
         );
         
-        // Render ellipse entities through EllipseEntityManager (generic, not GPS-specific)
         ellipseEntityManager.update(visibleEntities);
-        
-        // Render polyline entities through PolylineEntityManager (generic path rendering)
         polylineEntityManager.update(visibleEntities);
+        polygonEntityManager.update(visibleEntities);
 
         // Update primitive-based entities without destroying the animation loop
         renderEntitiesChunked(viewer, primitiveEntities, animatablesMapRef.current);

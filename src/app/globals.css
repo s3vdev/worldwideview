@@ -744,6 +744,15 @@ html, body {
   50% { opacity: 0.5; transform: scale(0.8); }
 }
 
+/* Spinner animation for plugin loading (no static icon) */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.layer-item__spinner,
+.animate-spin {
+  animation: spin 0.8s linear infinite;
+}
+
 /* ─── Responsive ──────────────────────────────────────────── */
 @media (max-width: 768px) {
   .sidebar {

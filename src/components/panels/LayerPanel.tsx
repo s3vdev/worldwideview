@@ -47,10 +47,14 @@ export function LayerPanel() {
             pluginManager.enablePlugin(pluginId);
             useStore.getState().setLayerEnabled(pluginId, true);
 
-            // Check if plugin requires configuration
             const managed = pluginManager.getPlugin(pluginId);
             const settings = useStore.getState().dataConfig.pluginSettings[pluginId];
-            if (managed?.plugin.requiresConfiguration?.(settings)) {
+            // Satellites: open Data Configuration panel on Config/Overlay tab (like Cameras)
+            if (pluginId === "satellites") {
+                useStore.getState().setConfigPanelOpen(true);
+                useStore.getState().setActiveConfigTab("overlay");
+                useStore.getState().setHighlightLayerId(pluginId);
+            } else if (managed?.plugin.requiresConfiguration?.(settings)) {
                 useStore.getState().setConfigPanelOpen(true);
                 useStore.getState().setActiveConfigTab("overlay");
                 useStore.getState().setHighlightLayerId(pluginId);
@@ -129,12 +133,12 @@ export function LayerPanel() {
                                                 {managed.plugin.description}
                                             </div>
                                         </div>
-                                        {isEnabled && isLoading && count === 0 && (
-                                            <span className="layer-item__loading">
-                                                <Loader2 size={14} className="animate-spin" style={{ color: "var(--accent-cyan)" }} />
+                                        {isEnabled && isLoading && (
+                                            <span className="layer-item__loading" aria-hidden="true">
+                                                <Loader2 size={14} className="layer-item__spinner" style={{ color: "var(--accent-cyan)" }} />
                                             </span>
                                         )}
-                                        {isEnabled && count > 0 && (
+                                        {isEnabled && !isLoading && count > 0 && (
                                             <span className="layer-item__count">
                                                 {count.toLocaleString()}
                                             </span>

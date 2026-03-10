@@ -1,0 +1,9 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Constellation / OneWeb: hex pattern + nodes -->
+  <circle cx="12" cy="8" r="2" fill="#FFFFFF"/>
+  <circle cx="7" cy="12" r="1.5" fill="#FFFFFF" opacity="0.9"/>
+  <circle cx="17" cy="12" r="1.5" fill="#FFFFFF" opacity="0.9"/>
+  <circle cx="9" cy="17" r="1.5" fill="#FFFFFF" opacity="0.85"/>
+  <circle cx="15" cy="17" r="1.5" fill="#FFFFFF" opacity="0.85"/>
+  <path d="M12 8L7 12M12 8l5 4M7 12l2 5M17 12l-2 5M9 17l6 0" stroke="#FFFFFF" stroke-width="0.8" opacity="0.6"/>
+</svg>

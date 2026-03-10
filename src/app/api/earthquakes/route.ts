@@ -1,29 +1,33 @@
 import { NextResponse } from "next/server";
+import { get, set } from "@/lib/serverCache";
 
 /**
  * Earthquake API Route
- * 
- * Fetches live earthquake data from USGS GeoJSON feed
- * Endpoint: https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson
- * 
- * This feed provides:
- * - All global earthquakes in the last 24 hours
- * - GeoJSON format
- * - Magnitude, depth, coordinates, timestamp
- * - Place description
- * - No authentication required
+ * Fetches live earthquake data from USGS GeoJSON feed.
+ * Response cached by Data Config → Cache & Limits → Cache Max Age (Ms).
  */
 
 const USGS_FEED_URL = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson";
+const CACHE_KEY_EARTHQUAKES = "earthquakes";
 
-export async function GET() {
+function clampTtl(ms: number): number {
+    return Math.min(24 * 60 * 60 * 1000, Math.max(5 * 60 * 1000, ms || 5 * 60 * 1000));
+}
+
+export async function GET(request: Request) {
+    const url = new URL(request.url);
+    const cacheMaxAgeParam = url.searchParams.get("cacheMaxAgeMs");
+    const cacheTtlMs = clampTtl(cacheMaxAgeParam ? parseInt(cacheMaxAgeParam, 10) : 5 * 60 * 1000);
+
+    if (cacheTtlMs > 0) {
+        const cached = get<{ type: string; metadata?: unknown; features: unknown[] }>(CACHE_KEY_EARTHQUAKES);
+        if (cached) return NextResponse.json(cached);
+    }
+
     try {
-        // Fetch from USGS GeoJSON feed
         const res = await fetch(USGS_FEED_URL, {
-            cache: "no-store", // Always fetch fresh data
-            headers: {
-                "User-Agent": "WorldWideView/1.0 (Educational Project)",
-            },
+            cache: "no-store",
+            headers: { "User-Agent": "WorldWideView/1.0 (Educational Project)" },
         });
 
         if (!res.ok) {
@@ -36,7 +40,6 @@ export async function GET() {
 
         const data = await res.json();
 
-        // Validate GeoJSON structure
         if (!data.features || !Array.isArray(data.features)) {
             console.error("[Earthquake API] Invalid GeoJSON format from USGS");
             return NextResponse.json(
@@ -45,7 +48,6 @@ export async function GET() {
             );
         }
 
-        // Filter out invalid entries (missing coordinates or magnitude)
         const validFeatures = data.features.filter((feature: any) => {
             const coords = feature?.geometry?.coordinates;
             const mag = feature?.properties?.mag;
@@ -61,19 +63,17 @@ export async function GET() {
 
         console.log(`[Earthquake API] Fetched ${validFeatures.length} valid earthquakes from USGS`);
 
-        // Return normalized GeoJSON
-        return NextResponse.json({
+        const body = {
             type: "FeatureCollection",
             metadata: data.metadata || {},
             features: validFeatures,
-        });
+        };
+        if (cacheTtlMs > 0) set(CACHE_KEY_EARTHQUAKES, body, cacheTtlMs);
+        return NextResponse.json(body);
     } catch (err) {
         console.error("[Earthquake API] Fetch error:", err);
         return NextResponse.json(
-            { 
-                error: err instanceof Error ? err.message : "Unknown error",
-                features: [] 
-            },
+            { error: err instanceof Error ? err.message : "Unknown error", features: [] },
             { status: 500 }
         );
     }

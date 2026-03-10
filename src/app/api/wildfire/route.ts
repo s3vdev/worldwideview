@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
+import { get, set } from "@/lib/serverCache";
 
-// In-memory cache
-let cachedData: unknown = null;
-let cacheTimestamp = 0;
-const CACHE_TTL = 300000; // 5 minutes
+const CACHE_KEY_WILDFIRE = "wildfire";
+
+function clampTtl(ms: number): number {
+    if (ms <= 0) return 0;
+    return Math.min(24 * 60 * 60 * 1000, Math.max(5 * 60 * 1000, ms));
+}
 
 interface FIRMSRecord {
     latitude: number;
@@ -62,11 +65,13 @@ function parseCSV(csv: string): FIRMSRecord[] {
 }
 
 export async function GET(request: Request) {
-    const now = Date.now();
+    const cacheMaxAgeParam = request.url ? new URL(request.url).searchParams.get("cacheMaxAgeMs") : null;
+    const cacheTtlMs = clampTtl(cacheMaxAgeParam ? parseInt(cacheMaxAgeParam, 10) : 5 * 60 * 1000);
+    const cacheKey = CACHE_KEY_WILDFIRE;
 
-    // Return cached data if fresh
-    if (cachedData && now - cacheTimestamp < CACHE_TTL) {
-        return NextResponse.json(cachedData);
+    if (cacheTtlMs > 0) {
+        const cached = get<{ fires: unknown[]; totalCount: number }>(cacheKey);
+        if (cached) return NextResponse.json(cached);
     }
 
     try {
@@ -75,30 +80,24 @@ export async function GET(request: Request) {
         let url: string;
 
         if (apiKey) {
-            // Use FIRMS API with key — VIIRS SNPP, last 24h
             url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${apiKey}/VIIRS_SNPP_NRT/world/1`;
         } else {
-            // Use open CSV feed (limited, but no key needed)
             url = `https://firms.modaps.eosdis.nasa.gov/data/active_fire/suomi-npp-viirs-c2/csv/SUOMI_VIIRS_C2_Global_24h.csv`;
         }
 
-        const res = await fetch(url, {
-            next: { revalidate: 300 },
-        });
+        const res = await fetch(url, { cache: "no-store" });
 
         if (!res.ok) {
-            if (cachedData) return NextResponse.json(cachedData);
             return NextResponse.json({ fires: [] });
         }
 
         const csv = await res.text();
         const fires = parseCSV(csv);
 
-        // Dynamic Multi-Tier Clustering
         const tiers = [
-            { level: 1, size: 2.0 },   // Macro: ~220km
-            { level: 2, size: 0.5 },   // Meso: ~55km
-            { level: 3, size: 0.05 },  // Micro: ~5.5km
+            { level: 1, size: 2.0 },
+            { level: 2, size: 0.5 },
+            { level: 3, size: 0.05 },
         ];
 
         const allClusteredFires: (FIRMSRecord & { tier: number })[] = [];
@@ -121,15 +120,11 @@ export async function GET(request: Request) {
             allClusteredFires.push(...Array.from(clustered.values()));
         }
 
-        // Send all grouped fires
         const data = { fires: allClusteredFires, totalCount: allClusteredFires.length };
-        cachedData = data;
-        cacheTimestamp = now;
-
+        if (cacheTtlMs > 0) set(cacheKey, data, cacheTtlMs);
         return NextResponse.json(data);
     } catch (err) {
         console.error("[API/wildfire] Error:", err);
-        if (cachedData) return NextResponse.json(cachedData);
         return NextResponse.json({ fires: [] });
     }
 }

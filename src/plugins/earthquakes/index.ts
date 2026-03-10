@@ -9,6 +9,7 @@ import type {
     ServerPluginConfig,
     FilterDefinition,
 } from "@/core/plugins/PluginTypes";
+import { useStore } from "@/core/state/store";
 
 /**
  * Earthquake Plugin - Real-time global seismic activity
@@ -185,7 +186,8 @@ export class EarthquakePlugin implements WorldPlugin {
 
     async fetch(_timeRange: TimeRange): Promise<GeoEntity[]> {
         try {
-            const res = await fetch("/api/earthquakes");
+            const cacheMs = useStore.getState().dataConfig.cacheEnabled ? useStore.getState().dataConfig.cacheMaxAge : 0;
+            const res = await fetch(`/api/earthquakes?cacheMaxAgeMs=${cacheMs}`);
 
             if (!res.ok) {
                 console.error(`[EarthquakePlugin] API returned ${res.status}: ${res.statusText}`);

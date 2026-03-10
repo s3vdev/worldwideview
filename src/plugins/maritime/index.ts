@@ -8,6 +8,7 @@ import type {
     CesiumEntityOptions,
     FilterDefinition,
 } from "@/core/plugins/PluginTypes";
+import { useStore } from "@/core/state/store";
 
 const VESSEL_COLORS: Record<string, string> = {
     cargo: "#f59e0b",     // amber
@@ -88,7 +89,8 @@ export class MaritimePlugin implements WorldPlugin {
 
     async fetch(_timeRange: TimeRange): Promise<GeoEntity[]> {
         try {
-            const res = await fetch("/api/maritime");
+            const cacheMs = useStore.getState().dataConfig.cacheEnabled ? useStore.getState().dataConfig.cacheMaxAge : 0;
+            const res = await fetch(`/api/maritime?cacheMaxAgeMs=${cacheMs}`);
             if (!res.ok) throw new Error(`Maritime API returned ${res.status}`);
             const data = await res.json();
             const vessels = data.vessels || generateDemoVessels();

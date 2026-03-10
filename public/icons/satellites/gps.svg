@@ -1,0 +1,10 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- GPS/Navigation: dish + crosshair -->
+  <circle cx="12" cy="12" r="6" fill="none" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="12" cy="12" r="2" fill="#FFFFFF"/>
+  <line x1="12" y1="2" x2="12" y2="6" stroke="#FFFFFF" stroke-width="1.2"/>
+  <line x1="12" y1="18" x2="12" y2="22" stroke="#FFFFFF" stroke-width="1.2"/>
+  <line x1="2" y1="12" x2="6" y2="12" stroke="#FFFFFF" stroke-width="1.2"/>
+  <line x1="18" y1="12" x2="22" y2="12" stroke="#FFFFFF" stroke-width="1.2"/>
+  <path d="M5.2 5.2l2.8 2.8M16 16l2.8 2.8M5.2 18.8l2.8-2.8M16 8l2.8-2.8" stroke="#FFFFFF" stroke-width="1" stroke-linecap="round"/>
+</svg>

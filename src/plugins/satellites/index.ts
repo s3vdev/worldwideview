@@ -49,18 +49,34 @@ interface TLERecord {
     group: string;
 }
 
+/** Default groups fetched on initial activation (all 9 groups) */
+const DEFAULT_SATELLITE_GROUPS = [
+    "stations", "gps-ops", "weather", "starlink",
+    "oneweb", "iridium", "planet", "military", "active",
+] as const;
+
+interface SatelliteAPIDebug {
+    requestedGroups: string[];
+    countPerGroup: Record<string, number>;
+    totalCount: number;
+    starlinkIncluded: boolean;
+    starlinkLimitApplied: number | null;
+    activeIncluded?: boolean;
+    activeLimitApplied?: number | null;
+}
+
 interface SatelliteAPIResponse {
     tles: TLERecord[];
     timestamp: string;
     source: string;
     requestedGroups?: string[];
     starlinkLimit?: number;
+    activeLimit?: number;
+    debug?: SatelliteAPIDebug;
     error?: string;
 }
 
-/**
- * Get color for satellite group
- */
+/** Satellite group to display color */
 function groupToColor(group: string): string {
     switch (group) {
         case "stations":
@@ -71,8 +87,42 @@ function groupToColor(group: string): string {
             return "#f59e0b"; // amber — weather satellites
         case "gps-ops":
             return "#22c55e"; // green — GPS satellites
+        case "oneweb":
+            return "#38bdf8"; // sky — OneWeb constellation
+        case "iridium":
+            return "#818cf8"; // indigo — Iridium
+        case "planet":
+            return "#f97316"; // orange — Planet imaging
+        case "military":
+            return "#ef4444"; // red — military/recon
+        case "active":
+            return "#94a3b8"; // gray — active (mixed)
         default:
             return "#94a3b8"; // gray — unknown
+    }
+}
+
+/** Satellite group to icon path (under public/icons/satellites/) */
+function groupToIconPath(group: string): string {
+    switch (group) {
+        case "stations":
+            return "/icons/satellites/station.svg";
+        case "gps-ops":
+            return "/icons/satellites/gps.svg";
+        case "weather":
+            return "/icons/satellites/weather.svg";
+        case "starlink":
+            return "/icons/satellites/starlink.svg";
+        case "oneweb":
+            return "/icons/satellites/constellation.svg";
+        case "planet":
+            return "/icons/satellites/imaging.svg";
+        case "military":
+            return "/icons/satellites/recon.svg";
+        case "iridium":
+        case "active":
+        default:
+            return "/icons/satellites/constellation.svg";
     }
 }
 
@@ -219,41 +269,37 @@ export class SatellitesPlugin implements WorldPlugin {
             const settingsRaw = useStore.getState().dataConfig.pluginSettings[this.id];
             const settings = {
                 starlinkLimit: 50,
+                activeLimit: 100,
+                pollingInterval: 6 * 60 * 60 * 1000,
                 maxVisibleSatellites: 500,
                 ...(settingsRaw || {}),
             };
             
-            // Get active filters to determine which groups to fetch
+            // Determine which groups to fetch: use filter state only when user has explicitly selected groups; otherwise always use defaults (including starlink)
             const activeFilters = useStore.getState().filters[this.id] || {};
             const groupFilter = activeFilters["group"];
-            
-            // Determine enabled groups from filter state
             let enabledGroups: string[];
-            
-            if (groupFilter && groupFilter.type === "select" && Array.isArray(groupFilter.values) && groupFilter.values.length > 0) {
-                // Filter is set - use the selected groups (including starlink if selected)
+
+            if (groupFilter?.type === "select" && Array.isArray(groupFilter.values) && groupFilter.values.length > 0) {
                 enabledGroups = groupFilter.values.map((v: string) => {
                     const normalized = String(v).toLowerCase().trim();
-                    // Map "gps" to "gps-ops" if needed
                     if (normalized === "gps") return "gps-ops";
                     return normalized;
                 }).filter((v: string) => v.length > 0);
             } else {
-                // No filter - load all default groups (stations, gps-ops, weather, starlink)
-                // This is a stable default that includes all intended satellite groups
-                // starlinkLimit will still be applied to limit Starlink satellites
-                enabledGroups = ["stations", "gps-ops", "weather", "starlink"];
+                enabledGroups = [...DEFAULT_SATELLITE_GROUPS];
             }
-            
-            // Ensure we have at least one group
             if (enabledGroups.length === 0) {
-                enabledGroups = ["stations", "gps-ops", "weather", "starlink"];
+                enabledGroups = [...DEFAULT_SATELLITE_GROUPS];
             }
             
-            // Build API URL with query parameters
+            // Build API URL (cacheMaxAgeMs from Data Config → Cache & Limits)
+            const cacheMs = useStore.getState().dataConfig.cacheEnabled ? useStore.getState().dataConfig.cacheMaxAge : 0;
             const params = new URLSearchParams({
                 groups: enabledGroups.join(","),
                 starlinkLimit: settings.starlinkLimit.toString(),
+                activeLimit: (settings.activeLimit ?? 100).toString(),
+                cacheMaxAgeMs: String(cacheMs),
             });
             const apiUrl = `/api/satellites?${params.toString()}`;
             
@@ -266,10 +312,16 @@ export class SatellitesPlugin implements WorldPlugin {
 
             const data: SatelliteAPIResponse = await res.json();
 
+            if (data.debug) {
+                const d = data.debug;
+                console.log(
+                    `[SatellitesPlugin] Load debug: requested=${d.requestedGroups.join(",")} | total=${d.totalCount} | perGroup=${JSON.stringify(d.countPerGroup)} | starlinkLimit=${d.starlinkLimitApplied ?? "n/a"} | activeLimit=${d.activeLimitApplied ?? "n/a"}`
+                );
+            }
+
             if (!data.tles || !Array.isArray(data.tles)) {
                 return [];
             }
-            
             if (data.tles.length === 0) {
                 return [];
             }
@@ -340,7 +392,12 @@ export class SatellitesPlugin implements WorldPlugin {
                 }
             }
 
-            console.log(`[SatellitesPlugin] Fetched ${entities.length} satellite positions`);
+            const filteredCount = entities.length;
+            if (data.debug) {
+                console.log(
+                    `[SatellitesPlugin] Merged total=${data.tles.length} → after processing/limits visible=${filteredCount}`
+                );
+            }
             return entities;
         } catch (err) {
             console.error("[SatellitesPlugin] Fetch error:", err);
@@ -423,9 +480,10 @@ export class SatellitesPlugin implements WorldPlugin {
             labelText = entity.label;
         }
         
+        const iconUrl = groupToIconPath(group);
         return {
-            type: "billboard", // Use billboard for recognizable satellite icon
-            iconUrl: "/satellite-icon.svg",
+            type: "billboard",
+            iconUrl,
             color, // Tint the icon based on group
             size, // Altitude-aware sizing (32-40px), ISS: 56px
             labelText,
@@ -493,9 +551,14 @@ export class SatellitesPlugin implements WorldPlugin {
                 propertyKey: "group",
                 options: [
                     { value: "stations", label: "Space Stations" },
-                    { value: "starlink", label: "Starlink" },
-                    { value: "weather", label: "Weather" },
                     { value: "gps-ops", label: "GPS" },
+                    { value: "weather", label: "Weather" },
+                    { value: "starlink", label: "Starlink" },
+                    { value: "oneweb", label: "OneWeb" },
+                    { value: "iridium", label: "Iridium" },
+                    { value: "planet", label: "Planet" },
+                    { value: "military", label: "Military" },
+                    { value: "active", label: "Active" },
                 ],
             },
             {

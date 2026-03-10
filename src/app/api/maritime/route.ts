@@ -1,24 +1,38 @@
 import { NextResponse } from "next/server";
 import { getCachedVessels, startAisStream } from "@/lib/ais-stream";
+import { get, set } from "@/lib/serverCache";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
+
+const CACHE_KEY_MARITIME = "maritime";
+
 
 /**
  * Maritime AIS proxy.
- * Returns live data from aisstream.io.
+ * Returns live data from aisstream.io. Response cached by Cache & Limits → Cache Max Age (Ms).
  */
-export async function GET() {
-    startAisStream(); // Ensure stream is initialized
+function clampTtl(ms: number): number {
+    if (ms <= 0) return 0;
+    return Math.min(24 * 60 * 60 * 1000, Math.max(5 * 60 * 1000, ms));
+}
 
+export async function GET(request: Request) {
+    const url = new URL(request.url);
+    const cacheMaxAgeParam = url.searchParams.get("cacheMaxAgeMs");
+    const cacheTtlMs = clampTtl(cacheMaxAgeParam ? parseInt(cacheMaxAgeParam, 10) : 60 * 1000);
+
+    if (cacheTtlMs > 0) {
+        const cached = get<{ vessels: unknown[] }>(CACHE_KEY_MARITIME);
+        if (cached) return NextResponse.json(cached);
+    }
+
+    startAisStream();
     const vessels = getCachedVessels();
 
-    // If the cache is completely empty, we return null to trigger the fallback demo data
-    // in the plugin while the websocket populates. Once it's running, we return the real array.
     if (vessels.length === 0) {
         return NextResponse.json({ vessels: null });
     }
 
-    // Format the cached data into GeoEntities
     const geoEntities = vessels.map((v) => ({
         id: `maritime-${v.mmsi}`,
         pluginId: "maritime",
@@ -31,11 +45,13 @@ export async function GET() {
         properties: {
             mmsi: v.mmsi,
             vesselName: v.name,
-            vesselType: v.type, // TODO: Enhance with real type categorization if needed
+            vesselType: v.type,
             speed_knots: v.speed,
             heading: v.heading,
         },
     }));
 
-    return NextResponse.json({ vessels: geoEntities });
+    const body = { vessels: geoEntities };
+    if (cacheTtlMs > 0) set(CACHE_KEY_MARITIME, body, cacheTtlMs);
+    return NextResponse.json(body);
 }

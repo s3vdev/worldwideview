@@ -78,15 +78,13 @@ class PluginManager {
             async () => {
                 const managed = this.plugins.get(plugin.id);
                 if (!managed || !managed.enabled) return;
-                
-                // Set loading state before fetch
+
                 useStore.getState().setLayerLoading(plugin.id, true);
-                
+
                 try {
                     const entities = await plugin.fetch(managed.context.timeRange);
-                    this.handleDataUpdate(plugin.id, entities);
+                    if (managed.enabled) this.handleDataUpdate(plugin.id, entities);
                 } finally {
-                    // Clear loading state after fetch completes
                     useStore.getState().setLayerLoading(plugin.id, false);
                 }
             }
@@ -98,19 +96,19 @@ class PluginManager {
         if (!managed) return;
         managed.enabled = true;
 
+        // Show loading indicator immediately when toggle is turned ON
+        useStore.getState().setLayerLoading(pluginId, true);
+
         // Try to load from cache immediately so UI feels responsive
         let cached = cacheLayer.get(pluginId);
         if (!cached) {
             cached = await cacheLayer.getFromPersistent(pluginId);
         }
 
-        // If still enabled and we got cached data, emit it
+        // If still enabled and we got cached data, emit it (spinner stays until fetch completes)
         if (cached && managed.enabled) {
             managed.entities = cached;
             dataBus.emit("dataUpdated", { pluginId, entities: cached });
-        } else {
-            // No cached data - set loading state and trigger immediate fetch
-            useStore.getState().setLayerLoading(pluginId, true);
         }
 
         pollingManager.start(pluginId);
@@ -123,6 +121,7 @@ class PluginManager {
         managed.enabled = false;
         managed.entities = [];
         pollingManager.stop(pluginId);
+        useStore.getState().setLayerLoading(pluginId, false);
         dataBus.emit("layerToggled", { pluginId, enabled: false });
         dataBus.emit("dataUpdated", { pluginId, entities: [] });
     }
@@ -140,16 +139,14 @@ class PluginManager {
     async fetchForPlugin(pluginId: string, timeRange: TimeRange): Promise<void> {
         const managed = this.plugins.get(pluginId);
         if (!managed || !managed.enabled) return;
-        
-        // Set loading state before fetch
+
         useStore.getState().setLayerLoading(pluginId, true);
-        
+
         try {
             managed.context.timeRange = timeRange;
             const entities = await managed.plugin.fetch(timeRange);
-            this.handleDataUpdate(pluginId, entities);
+            if (managed.enabled) this.handleDataUpdate(pluginId, entities);
         } finally {
-            // Clear loading state after fetch completes
             useStore.getState().setLayerLoading(pluginId, false);
         }
     }

@@ -269,7 +269,8 @@ export class AviationPlugin implements WorldPlugin {
                     };
                 });
             } else {
-                res = await fetch("/api/aviation");
+                const cacheMs = state.dataConfig.cacheEnabled ? state.dataConfig.cacheMaxAge : 0;
+                res = await fetch(`/api/aviation?cacheMaxAgeMs=${cacheMs}`);
                 if (!res.ok) throw new Error(`Aviation API returned ${res.status}`);
                 data = await res.json();
 

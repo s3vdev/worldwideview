@@ -99,10 +99,11 @@ export default function GlobeView() {
             });
         });
         
-        // Generic: Inject derived entities for selected entity (e.g., satellite orbits, flight paths, coverage areas)
+        // Generic: Inject derived entities for selected entity (e.g., satellite orbits, ground track) only when that layer is enabled
         if (selectedEntity) {
             const managed = pluginManager.getPlugin(selectedEntity.pluginId);
-            if (managed && managed.plugin.getSelectionDerivedEntities) {
+            const layerEnabled = layers[selectedEntity.pluginId]?.enabled;
+            if (managed && layerEnabled && managed.plugin.getSelectionDerivedEntities) {
                 const derivedEntities = managed.plugin.getSelectionDerivedEntities(selectedEntity);
                 derivedEntities.forEach((derivedEntity) => {
                     const options = managed.plugin.renderEntity(derivedEntity);

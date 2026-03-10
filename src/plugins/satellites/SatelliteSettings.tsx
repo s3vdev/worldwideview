@@ -12,6 +12,7 @@ export const SatelliteSettings: React.FC<{ pluginId: string }> = ({ pluginId }) 
     const settings = {
         pollingInterval: 6 * 60 * 60 * 1000, // 6 hours (TLE data doesn't change rapidly)
         starlinkLimit: 50,       // Limit Starlink to avoid overload
+        activeLimit: 100,        // Limit Active group (6000+ sats) to avoid overload
         maxVisibleSatellites: 500, // Performance cap
         showLabels: false,       // Labels disabled by default (clutter)
         showOrbitForSelected: true,   // Show orbit when satellite selected
@@ -30,6 +31,12 @@ export const SatelliteSettings: React.FC<{ pluginId: string }> = ({ pluginId }) 
     const handleStarlinkLimitChange = (limit: number) => {
         updatePluginSettings(pluginId, {
             starlinkLimit: Math.max(10, Math.min(200, limit)),
+        });
+    };
+
+    const handleActiveLimitChange = (limit: number) => {
+        updatePluginSettings(pluginId, {
+            activeLimit: Math.max(50, Math.min(500, limit)),
         });
     };
 
@@ -68,7 +75,7 @@ export const SatelliteSettings: React.FC<{ pluginId: string }> = ({ pluginId }) 
                     </div>
                 </div>
                 <div style={{ fontSize: 9, color: "var(--text-muted)", lineHeight: 1.4 }}>
-                    Use the <strong>Filters</strong> tab to select which satellite groups to display (Space Stations, GPS, Weather, Starlink).
+                    Use the <strong>Filters</strong> tab to select which satellite groups to display (Space Stations, GPS, Weather, Starlink, OneWeb, Iridium, Planet, Military, Active).
                 </div>
             </div>
 
@@ -97,6 +104,28 @@ export const SatelliteSettings: React.FC<{ pluginId: string }> = ({ pluginId }) 
                     />
                     <div style={{ fontSize: 9, color: "var(--text-muted)", marginTop: "2px" }}>
                         Limit Starlink satellites to avoid overload
+                    </div>
+                </div>
+
+                {/* Active Limit */}
+                <div style={{ marginBottom: "var(--space-md)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                        <label style={{ fontSize: 10, color: "var(--text-muted)" }}>Active Limit</label>
+                        <span style={{ fontSize: 10, color: "var(--text-primary)", fontFamily: "JetBrains Mono, monospace" }}>
+                            {settings.activeLimit ?? 100}
+                        </span>
+                    </div>
+                    <input
+                        type="range"
+                        min="50"
+                        max="500"
+                        step="50"
+                        value={settings.activeLimit ?? 100}
+                        onChange={(e) => handleActiveLimitChange(Number(e.target.value))}
+                        style={{ width: "100%", accentColor: "var(--accent-cyan)" }}
+                    />
+                    <div style={{ fontSize: 9, color: "var(--text-muted)", marginTop: "2px" }}>
+                        Limit Active satellites (6000+ total) for performance
                     </div>
                 </div>
 

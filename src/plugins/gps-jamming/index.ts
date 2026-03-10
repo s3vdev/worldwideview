@@ -9,31 +9,23 @@ import type {
     ServerPluginConfig,
     FilterDefinition,
 } from "@/core/plugins/PluginTypes";
+import { useStore } from "@/core/state/store";
 
 /**
- * GPS Jamming / GNSS Interference Plugin (DEMO/FALLBACK ONLY)
- * 
- * ⚠️ WARNING: This plugin uses STATIC DEMONSTRATION DATA, not live feeds.
- * 
- * Why? GPSJAM (https://gpsjam.org/) does NOT provide a machine-readable API.
- * - GPSJAM is a visual-only tool with no JSON/GeoJSON endpoints
- * - Data requires web scraping (unreliable, potentially ToS violation)
- * - ADS-B Exchange direct integration requires commercial agreements
- * 
- * Current Implementation: Curated fallback data based on publicly reported hotspots
- * Future: Replace with real data source or remove this plugin
- * 
- * Visualization: Semi-transparent circular regions around hotspots
- * - Represents approximate affected area (not precise boundaries)
- * - Radius scaled by severity and affected percentage
+ * GPS Jamming / GNSS Interference Plugin
+ *
+ * Data source: gpsjam.org (verified: /data/manifest.csv and /data/{date}-h3_4.csv).
+ * Real H3 hexagon data; no dummy or fallback data. Empty layer if source unavailable.
+ * Renders interference areas as semi-transparent Cesium polygon primitives.
+ * Color by severity (GPSJAM thresholds): low 0-2% -> yellow, medium 2-10% -> orange, high >10% -> red.
+ * Polygons are static until data refresh; no heavy allocations in animation loop.
  */
 
-interface GPSJammingDataPoint {
+interface GpsJammingPolygon {
     id: string;
-    latitude: number;
-    longitude: number;
     severity: "low" | "medium" | "high";
     affectedPercent: number;
+    positions: Array<{ latitude: number; longitude: number; altitude?: number }>;
     timestamp: string;
     region?: string;
 }
@@ -41,89 +33,55 @@ interface GPSJammingDataPoint {
 function severityToColor(severity: string): string {
     switch (severity) {
         case "high":
-            return "#ef4444"; // red — >10% aircraft affected
+            return "#ef4444"; // red
         case "medium":
-            return "#f59e0b"; // amber/yellow — 2-10% affected
+            return "#f97316"; // orange
         case "low":
-            return "#22c55e"; // green — minimal interference
+            return "#eab308"; // yellow
         default:
-            return "#94a3b8"; // gray — unknown
+            return "#94a3b8";
     }
 }
 
-/**
- * Calculate affected area radius in meters based on severity
- * These are approximate visual representations, not measured boundaries
- */
-function severityToRadius(severity: string, affectedPercent: number): number {
-    // Base radius in meters (approximate affected area)
-    let baseRadius: number;
-    
-    switch (severity) {
-        case "high":
-            baseRadius = 150000; // ~150km for high severity
-            break;
-        case "medium":
-            baseRadius = 100000; // ~100km for medium severity
-            break;
-        case "low":
-            baseRadius = 60000; // ~60km for low severity
-            break;
-        default:
-            baseRadius = 50000;
-    }
-    
-    // Scale slightly by affected percentage (10-30% scaling range)
-    const percentScale = 1.0 + (affectedPercent / 100) * 0.3;
-    
-    return baseRadius * percentScale;
-}
-
-/**
- * Convert severity to fill opacity for ellipse visualization
- */
 function severityToFillOpacity(severity: string): number {
     switch (severity) {
         case "high":
-            return 0.25; // 25% opacity for high severity
+            return 0.35;
         case "medium":
-            return 0.20; // 20% opacity for medium
+            return 0.3;
         case "low":
-            return 0.15; // 15% opacity for low
+            return 0.25;
         default:
-            return 0.15;
+            return 0.25;
     }
 }
 
-/**
- * Convert severity to outline opacity
- */
-function severityToOutlineOpacity(severity: string): number {
-    switch (severity) {
-        case "high":
-            return 0.6; // 60% opacity for high severity
-        case "medium":
-            return 0.5; // 50% opacity for medium
-        case "low":
-            return 0.4; // 40% opacity for low
-        default:
-            return 0.4;
+/** Centroid of polygon (for entity position / selection) */
+function polygonCentroid(
+    positions: Array<{ latitude: number; longitude: number }>
+): { latitude: number; longitude: number } {
+    if (!positions.length) return { latitude: 0, longitude: 0 };
+    let lat = 0, lon = 0;
+    for (const p of positions) {
+        lat += p.latitude;
+        lon += p.longitude;
     }
+    return { latitude: lat / positions.length, longitude: lon / positions.length };
 }
 
 export class GPSJammingPlugin implements WorldPlugin {
     id = "gps-jamming";
-    name = "GPS Jamming (Demo)";
-    description = "⚠️ Demo only - static hotspot data, not live feed";
+    name = "GPS Jamming";
+    description = "GNSS interference areas from gpsjam.org data (polygon visualization)";
     icon = Radio;
     category = "infrastructure" as const;
-    version = "1.0.0-demo";
+    version = "2.0.0";
 
     private context: PluginContext | null = null;
 
     async initialize(ctx: PluginContext): Promise<void> {
         this.context = ctx;
-        console.log("[GPSJammingPlugin] Initialized with context:", ctx);
+        console.log("[GPSJammingPlugin] Initialized");
     }
 
     destroy(): void {
@@ -133,49 +91,47 @@ export class GPSJammingPlugin implements WorldPlugin {
 
     async fetch(_timeRange: TimeRange): Promise<GeoEntity[]> {
         try {
-            const res = await fetch("/api/gps-jamming");
-            
+            const cacheMs = useStore.getState().dataConfig.cacheEnabled ? useStore.getState().dataConfig.cacheMaxAge : 0;
+            const res = await fetch(`/api/gps-jamming?cacheMaxAgeMs=${cacheMs}`);
             if (!res.ok) {
                 console.error(`[GPSJammingPlugin] API returned ${res.status}: ${res.statusText}`);
                 return [];
             }
-
             const data = await res.json();
-
-            if (data.error) {
-                console.warn("[GPSJammingPlugin] API Warning:", data.error);
+            if (data.error || !Array.isArray(data.polygons)) {
+                console.warn("[GPSJammingPlugin] Invalid response:", data.error || "no polygons");
+                return [];
+            }
+            if (data.debug) {
+                console.log("[GPSJammingPlugin] Debug:", data.debug.source, data.debug.polygonCount, "polygons", data.debug.notes?.join("; "));
+            }
+            if (data.polygons.length === 0) {
+                console.log("[GPSJammingPlugin] No interference data (source unavailable or no hexes for date). No fallback used.");
                 return [];
             }
 
-            if (!data.dataPoints || !Array.isArray(data.dataPoints)) {
-                console.warn("[GPSJammingPlugin] Invalid data format");
-                return [];
-            }
-
-            const entities = data.dataPoints.map((point: GPSJammingDataPoint): GeoEntity => {
-                const radiusMeters = severityToRadius(point.severity, point.affectedPercent);
-                
+            const entities: GeoEntity[] = data.polygons.map((poly: GpsJammingPolygon) => {
+                const centroid = polygonCentroid(poly.positions);
                 return {
-                    id: `gps-jamming-${point.id}`,
+                    id: `gps-jamming-${poly.id}`,
                     pluginId: "gps-jamming",
-                    latitude: point.latitude,
-                    longitude: point.longitude,
-                    altitude: 0, // Ground-level visualization
-                    timestamp: new Date(point.timestamp),
-                    label: `${point.severity.toUpperCase()} (${point.affectedPercent}%)`,
+                    latitude: centroid.latitude,
+                    longitude: centroid.longitude,
+                    altitude: 0,
+                    timestamp: new Date(poly.timestamp),
+                    label: `${poly.severity.toUpperCase()} (${poly.affectedPercent}%)`,
                     properties: {
-                        severity: point.severity,
-                        affectedPercent: point.affectedPercent,
-                        region: point.region || "Unknown",
-                        source: "GPSJAM (Demo)",
-                        description: `Approximate affected area (demo): ${point.affectedPercent}% of aircraft reporting degraded navigation accuracy`,
-                        radiusKm: Math.round(radiusMeters / 1000), // For display in info card
-                        areaNote: "Approximate visualization - not a precise boundary",
+                        severity: poly.severity,
+                        affectedPercent: poly.affectedPercent,
+                        region: poly.region ?? "Unknown",
+                        source: data.source ?? "gpsjam.org",
+                        positions: poly.positions,
+                        description: `Interference area: ${poly.affectedPercent}% of aircraft reported degraded navigation accuracy`,
                     },
                 };
             });
 
-            console.warn(`[GPSJammingPlugin] ⚠️ DEMO MODE: Displaying ${entities.length} static hotspot data points (NOT LIVE)`);
+            console.log(`[GPSJammingPlugin] Loaded ${entities.length} interference polygons`);
             return entities;
         } catch (err) {
             console.error("[GPSJammingPlugin] Fetch error:", err);
@@ -184,48 +140,48 @@ export class GPSJammingPlugin implements WorldPlugin {
     }
 
     getPollingInterval(): number {
-        // GPSJAM updates daily with 24-hour aggregation
-        // Poll every 12 hours to stay reasonably fresh without being aggressive
-        return 12 * 60 * 60 * 1000; // 12 hours in milliseconds
+        return 12 * 60 * 60 * 1000; // 12 hours
     }
 
     getLayerConfig(): LayerConfig {
         return {
-            color: "#f59e0b", // Default amber/warning color
-            clusterEnabled: false, // Disable clustering for area-based visualization
+            color: "#f97316",
+            clusterEnabled: false,
             clusterDistance: 0,
-            maxEntities: 2000,
+            maxEntities: 500,
         };
     }
 
     renderEntity(entity: GeoEntity): CesiumEntityOptions {
         const severity = entity.properties.severity as string;
-        const affectedPercent = entity.properties.affectedPercent as number;
+        const positions = entity.properties.positions as Array<{ latitude: number; longitude: number; altitude?: number }>;
+        const affectedPercent = (entity.properties.affectedPercent as number) ?? 0;
 
-        // Calculate rendering parameters
-        const radiusMeters = severityToRadius(severity, affectedPercent);
+        if (!positions || positions.length < 3) {
+            return { type: "point", color: severityToColor(severity), size: 8 };
+        }
+
+        const color = severityToColor(severity);
         const fillOpacity = severityToFillOpacity(severity);
-        const baseColor = severityToColor(severity);
 
-        // Return ellipse-type entity with generic rendering options
         return {
-            type: "ellipse",
-            color: baseColor, // Used for fill color
-            outlineColor: baseColor, // Same color but will be more opaque
-            radiusMeters, // Generic ellipse parameter
-            fillOpacity, // Generic ellipse parameter
-            outlineWidth: 2,
+            type: "polygon",
+            positions,
+            color,
+            fillOpacity,
+            outlineColor: color,
             showOutline: true,
-            distanceDisplayCondition: { near: 10, far: 10_000_000 }, // Show up to 10,000km
-            labelText: affectedPercent >= 10 ? entity.label : undefined, // Only show labels for significant interference
-            labelFont: "12px JetBrains Mono, monospace",
+            outlineWidth: 1.5,
+            distanceDisplayCondition: { near: 10, far: 10_000_000 },
+            labelText: affectedPercent >= 10 ? entity.label : undefined,
+            labelFont: "11px JetBrains Mono, monospace",
         };
     }
 
     getServerConfig(): ServerPluginConfig {
         return {
             apiBasePath: "/api/gps-jamming",
-            pollingIntervalMs: 12 * 60 * 60 * 1000, // 12 hours
+            pollingIntervalMs: 12 * 60 * 60 * 1000,
             requiresAuth: false,
             historyEnabled: false,
             availabilityEnabled: false,
@@ -247,7 +203,7 @@ export class GPSJammingPlugin implements WorldPlugin {
             },
             {
                 id: "affectedPercent",
-                label: "Affected Aircraft %",
+                label: "Affected %",
                 type: "range",
                 propertyKey: "affectedPercent",
                 range: { min: 0, max: 100, step: 5 },

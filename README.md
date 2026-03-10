@@ -29,10 +29,11 @@ As a real-time situational awareness platform, it turns raw geospatial signalsâ€
 - **Ship icon** with heading orientation
 - **Demo data** (AIS integration planned)
 
-### GPS Jamming (Demo)
-- **Elliptical coverage areas** for GPS interference zones
-- **Color-coded by severity**
-- **Demo data** for proof-of-concept
+### GPS Jamming
+- **Real data** from gpsjam.org (H3 hexagon polygons)
+- **Date resolution**: manifest or fallback (today â†’ previous days) for latest available dataset
+- **Color-coded by severity** (yellow/amber/red by affected aircraft %)
+- **Server-side caching** (Cache & Limits); no dummy or fallback polygons when source unavailable
 
 ### Earthquakes
 - **Live USGS earthquake data** (past 24 hours)

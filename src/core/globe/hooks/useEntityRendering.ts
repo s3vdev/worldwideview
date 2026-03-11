@@ -49,6 +49,7 @@ export function useEntityRendering(
 
     // Update entities without recreating the animation loop
     useEffect(() => {
+        const viewer = viewerRef.current;
         if (!viewer || !isReady || viewer.isDestroyed()) return;
 
         // Initialize ellipse manager with current viewer

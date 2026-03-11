@@ -143,17 +143,12 @@ export function useModelRendering(
             }
         };
 
-        // Run LOD check at a lower frequency (every 10 frames)
-        let frameCount = 0;
-        const onPreUpdate = () => {
-            if (frameCount++ % 10 === 0) updateLOD();
-        };
-
-        viewer.scene.preUpdate.addEventListener(onPreUpdate);
+        // Run LOD every frame so promoted model positions (posRef) stay in sync with AnimationLoop
+        viewer.scene.preUpdate.addEventListener(updateLOD);
 
         return () => {
             if (!viewer.isDestroyed()) {
-                viewer.scene.preUpdate.removeEventListener(onPreUpdate);
+                viewer.scene.preUpdate.removeEventListener(updateLOD);
             }
             // Cleanup all active models
             for (const [, active] of activeModels.entries()) {

@@ -365,6 +365,46 @@ export class AviationPlugin implements WorldPlugin {
         };
     }
 
+    /**
+     * Smooth movement between API polls: extrapolate position using velocity (m/s), heading (°), and optional vertical_rate (m/s).
+     * OpenSky provides these. Returns current position when timestamp is missing or too old.
+     */
+    getDynamicPosition(entity: GeoEntity, time: Date): { latitude: number; longitude: number; altitude?: number } | undefined {
+        const ts = entity.timestamp ? (typeof entity.timestamp === "string" ? new Date(entity.timestamp) : entity.timestamp) : null;
+        const tMs = ts?.getTime();
+        if (typeof tMs !== "number" || Number.isNaN(tMs)) {
+            return { latitude: entity.latitude, longitude: entity.longitude, altitude: entity.altitude };
+        }
+        let dtSec = (time.getTime() - tMs) / 1000;
+        // Clamp so we always extrapolate (avoids static position when server/client time skew or stale cache)
+        if (dtSec > 300 || dtSec < -300) {
+            dtSec = Math.max(-300, Math.min(300, dtSec));
+        }
+
+        const speed = Number(entity.speed) || 0;
+        const heading = Number(entity.heading) || 0;
+        const latRad = (entity.latitude * Math.PI) / 180;
+        const headingRad = (heading * Math.PI) / 180;
+        const metersPerDegLat = 111320;
+        const metersPerDegLon = 111320 * Math.max(0.01, Math.cos(latRad));
+
+        const dNorth = (speed * dtSec) * Math.cos(headingRad);
+        const dEast = (speed * dtSec) * Math.sin(headingRad);
+        const dLat = dNorth / metersPerDegLat;
+        const dLon = dEast / metersPerDegLon;
+
+        const altM = (entity.properties?.altitude_m as number | undefined) ?? (entity.altitude != null ? entity.altitude / 10 : 0);
+        const verticalRate = Number(entity.properties?.vertical_rate) || 0;
+        const newAltM = altM + verticalRate * dtSec;
+        const altitudeDisplay = newAltM * 10;
+
+        return {
+            latitude: entity.latitude + dLat,
+            longitude: entity.longitude + dLon,
+            altitude: altitudeDisplay,
+        };
+    }
+
     renderEntity(entity: GeoEntity): CesiumEntityOptions {
         const alt = entity.properties.altitude_m as number | null;
         const isAirborne = !entity.properties.on_ground;

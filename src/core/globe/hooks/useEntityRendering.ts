@@ -8,7 +8,7 @@ import { polygonEntityManager } from "../PolygonEntityManager";
 import { createUpdateLoop } from "../AnimationLoop";
 
 export function useEntityRendering(
-    viewer: CesiumViewer | null,
+    viewerRef: React.MutableRefObject<CesiumViewer | null>,
     isReady: boolean,
     visibleEntities: Array<{ entity: GeoEntity; options: CesiumEntityOptions }>,
     animatablesMapRef: React.MutableRefObject<Map<string, AnimatableItem>>,
@@ -24,25 +24,28 @@ export function useEntityRendering(
     const updateLoopRef = useRef<(() => void) | null>(null);
     const isAnimationLoopRegisteredRef = useRef(false);
 
-    // Initialize animation loop once and keep it running
+    // Initialize animation loop once and keep it running (loop reads viewerRef.current every frame)
     useEffect(() => {
+        const viewer = viewerRef.current;
         if (!viewer || !isReady || viewer.isDestroyed()) return;
 
-        // Only register the animation loop once
+        // Register loop once; pass refs so the loop always reads current viewer and map.
+        // preUpdate runs before render so position updates are visible the same frame.
         if (!isAnimationLoopRegisteredRef.current) {
-            updateLoopRef.current = createUpdateLoop(viewer, animatablesMapRef, hoveredEntityIdRef);
+            updateLoopRef.current = createUpdateLoop(viewerRef, animatablesMapRef, hoveredEntityIdRef);
             viewer.scene.preUpdate.addEventListener(updateLoopRef.current);
             isAnimationLoopRegisteredRef.current = true;
         }
 
         return () => {
-            if (updateLoopRef.current && !viewer.isDestroyed() && isAnimationLoopRegisteredRef.current) {
-                viewer.scene.preUpdate.removeEventListener(updateLoopRef.current);
+            const v = viewerRef.current;
+            if (updateLoopRef.current && v && !v.isDestroyed() && isAnimationLoopRegisteredRef.current) {
+                v.scene.preUpdate.removeEventListener(updateLoopRef.current);
                 isAnimationLoopRegisteredRef.current = false;
                 updateLoopRef.current = null;
             }
         };
-    }, [viewer, isReady, animatablesMapRef, hoveredEntityIdRef]);
+    }, [viewerRef, isReady, animatablesMapRef, hoveredEntityIdRef]);
 
     // Update entities without recreating the animation loop
     useEffect(() => {
@@ -81,7 +84,7 @@ export function useEntityRendering(
         renderEntitiesChunked(viewer, primitiveEntities, animatablesMapRef.current);
 
     }, [
-        viewer,
+        viewerRef,
         isReady,
         visibleEntities,
         sceneSettings.showFps,

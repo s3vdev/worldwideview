@@ -127,7 +127,7 @@ export default function GlobeView() {
     useCameraActions(viewerRef.current, viewerReady);
     useFollowCamera(viewerRef.current, viewerReady);
     // All entities go through billboard/point pipeline (including model-type as fallback)
-    useEntityRendering(viewerRef.current, viewerReady, visibleEntities, animatablesMapRef, hoveredEntityIdRef, sceneSettings);
+    useEntityRendering(viewerRef, viewerReady, visibleEntities, animatablesMapRef, hoveredEntityIdRef, sceneSettings);
     // LOD: promote nearby model-type entities to 3D models, hiding their billboard
     useModelRendering(viewerRef.current, viewerReady, animatablesMapRef);
 

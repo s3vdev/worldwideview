@@ -10,6 +10,7 @@ import {
     Transforms,
 } from "cesium";
 import type { Viewer as CesiumViewer } from "cesium";
+import type { MutableRefObject } from "react";
 import type { GeoEntity, CesiumEntityOptions } from "@/core/plugins/PluginTypes";
 import { useStore } from "@/core/state/store";
 import { getEntityColor, createLabel, removeLabel, type AnimatableItem } from "./EntityRenderer";
@@ -50,11 +51,12 @@ const scratchFollowMatrix = new Matrix4();
 /**
  * Creates the per-frame update function for entity position extrapolation,
  * horizon culling, frustum culling, and highlight styling.
+ * Uses refs so the loop always sees the latest viewer and animatables map.
  */
 export function createUpdateLoop(
-    viewer: CesiumViewer,
-    animatablesMapRef: React.MutableRefObject<Map<string, AnimatableItem>>,
-    hoveredEntityIdRef: React.MutableRefObject<string | null>
+    viewerRef: MutableRefObject<CesiumViewer | null>,
+    animatablesMapRef: MutableRefObject<Map<string, AnimatableItem>>,
+    hoveredEntityIdRef: MutableRefObject<string | null>
 ): () => void {
     let frameCount = 0;
 
@@ -62,6 +64,7 @@ export function createUpdateLoop(
     let cullingVolume = new CullingVolume();
 
     return () => {
+        const viewer = viewerRef.current;
         if (!viewer || viewer.isDestroyed()) return;
 
         // Lazy fetch of labels collection just once per frame
@@ -81,8 +84,9 @@ export function createUpdateLoop(
         // Extract camera culling volume for this frame
         cullingVolume = cam.frustum.computeCullingVolume(cam.positionWC, cam.directionWC, cam.upWC);
 
-        // Iterate over the live animatables map
-        for (const [, item] of animatablesMapRef.current.entries()) {
+        // Iterate over the live animatables map (read .current every frame so we always see latest)
+        const animatablesMap = animatablesMapRef.current;
+        for (const [, item] of animatablesMap.entries()) {
             const { primitive, entity, posRef } = item;
             const isModel = item.options.type === "model";
             const isSelected = state.selectedEntity?.id === entity.id;
@@ -90,33 +94,8 @@ export function createUpdateLoop(
 
             if (!primitive || primitive.isDestroyed?.()) continue;
 
-            // 1. Frustum Culling
-            scratchSphere.center = posRef;
-            scratchSphere.radius = 1000;
-            const intersect = cullingVolume.computeVisibility(scratchSphere);
-            const inFrustum = intersect !== Intersect.OUTSIDE;
-
-            if (!inFrustum && !isSelected && !isHovered) {
-                if (primitive.show !== false) primitive.show = false;
-                if (item.labelPrimitive && !item.labelPrimitive.isDestroyed?.() && item.labelPrimitive.show !== false) item.labelPrimitive.show = false;
-                continue;
-            }
-
-            // 2. Horizon culling
-            const posDistSqr = Cartesian3.magnitudeSquared(posRef);
-            const Dph = Math.sqrt(Math.max(0, posDistSqr - R2));
-            const distanceToPoint = Cartesian3.distance(camPos, posRef);
-            const isVisible = distanceToPoint <= (Dh + Dph);
-
-            if (!isVisible && !isSelected && !isHovered) {
-                if (primitive.show !== false) primitive.show = false;
-                if (item.labelPrimitive && !item.labelPrimitive.isDestroyed?.() && item.labelPrimitive.show !== false) item.labelPrimitive.show = false;
-                if (item.labelPrimitive && !item.labelPrimitive.isDestroyed?.() && labelsCollection) removeLabel(item, labelsCollection);
-                continue;
-            }
-
-            // 3. Position update for all (including promoted 3D models) so interpolation stays smooth
-            const managed = pluginManager.getPlugin(entity.pluginId);
+            // 1. Position update first (every frame, before culling) so billboards and models move smoothly
+            const managed = entity.pluginId ? pluginManager.getPlugin(entity.pluginId) : undefined;
             let positionUpdated = false;
             if (managed?.plugin.getDynamicPosition) {
                 try {
@@ -129,8 +108,13 @@ export function createUpdateLoop(
                             Ellipsoid.WGS84,
                             posRef
                         );
-                        if (!primitive.isDestroyed?.()) primitive.position = posRef;
-                        if (item.labelPrimitive && !item.labelPrimitive.isDestroyed?.()) item.labelPrimitive.position = posRef;
+                        if (!primitive.isDestroyed?.()) {
+                            const clonedPos = Cartesian3.clone(posRef, new Cartesian3());
+                            primitive.position = clonedPos;
+                            if (item.labelPrimitive && !item.labelPrimitive.isDestroyed?.()) {
+                                item.labelPrimitive.position = clonedPos;
+                            }
+                        }
                         positionUpdated = true;
                     }
                 } catch (err) {
@@ -143,6 +127,31 @@ export function createUpdateLoop(
                     extrapolatePosition(item, nowMs);
                     if (isModel) updateModelTransform(item, item.posRef, entity.heading);
                 }
+            }
+
+            // 2. Frustum culling (uses updated posRef)
+            scratchSphere.center = posRef;
+            scratchSphere.radius = 1000;
+            const intersect = cullingVolume.computeVisibility(scratchSphere);
+            const inFrustum = intersect !== Intersect.OUTSIDE;
+
+            if (!inFrustum && !isSelected && !isHovered) {
+                if (primitive.show !== false) primitive.show = false;
+                if (item.labelPrimitive && !item.labelPrimitive.isDestroyed?.() && item.labelPrimitive.show !== false) item.labelPrimitive.show = false;
+                continue;
+            }
+
+            // 3. Horizon culling
+            const posDistSqr = Cartesian3.magnitudeSquared(posRef);
+            const Dph = Math.sqrt(Math.max(0, posDistSqr - R2));
+            const distanceToPoint = Cartesian3.distance(camPos, posRef);
+            const isVisible = distanceToPoint <= (Dh + Dph);
+
+            if (!isVisible && !isSelected && !isHovered) {
+                if (primitive.show !== false) primitive.show = false;
+                if (item.labelPrimitive && !item.labelPrimitive.isDestroyed?.() && item.labelPrimitive.show !== false) item.labelPrimitive.show = false;
+                if (item.labelPrimitive && !item.labelPrimitive.isDestroyed?.() && labelsCollection) removeLabel(item, labelsCollection);
+                continue;
             }
 
             if (item._modelPromoted) continue;
@@ -256,9 +265,10 @@ function extrapolatePosition(item: AnimatableItem, nowMs: number): void {
     }
 
     if (entity.speed === 0) {
-        if (item.primitive && !item.primitive.isDestroyed?.() && item.primitive.position !== posRef) {
-            item.primitive.position = posRef;
-            if (item.labelPrimitive && !item.labelPrimitive.isDestroyed?.()) item.labelPrimitive.position = posRef;
+        if (item.primitive && !item.primitive.isDestroyed?.()) {
+            const clonedPos = Cartesian3.clone(posRef, new Cartesian3());
+            item.primitive.position = clonedPos;
+            if (item.labelPrimitive && !item.labelPrimitive.isDestroyed?.()) item.labelPrimitive.position = clonedPos;
         }
         return;
     }
@@ -266,8 +276,11 @@ function extrapolatePosition(item: AnimatableItem, nowMs: number): void {
     Cartesian3.multiplyByScalar(item.velocityVector, dtSec, scratchDisplacement);
     Cartesian3.add(item.basePosition!, scratchDisplacement, posRef);
 
-    if (item.primitive && !item.primitive.isDestroyed?.()) item.primitive.position = posRef;
-    if (item.labelPrimitive && !item.labelPrimitive.isDestroyed?.()) item.labelPrimitive.position = posRef;
+    if (item.primitive && !item.primitive.isDestroyed?.()) {
+        const clonedPos = Cartesian3.clone(posRef, new Cartesian3());
+        item.primitive.position = clonedPos;
+        if (item.labelPrimitive && !item.labelPrimitive.isDestroyed?.()) item.labelPrimitive.position = clonedPos;
+    }
 }
 
 /** Apply selected/hovered/normal highlight styling. */

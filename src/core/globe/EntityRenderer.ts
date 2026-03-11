@@ -15,6 +15,7 @@ import {
 import type { Viewer as CesiumViewer } from "cesium";
 import type { GeoEntity, CesiumEntityOptions } from "@/core/plugins/PluginTypes";
 import { useStore } from "@/core/state/store";
+import { pluginManager } from "@/core/plugins/PluginManager";
 
 /** Touch-friendly default point size: larger on mobile (coarse pointer). */
 function defaultPointSize(): number {
@@ -154,17 +155,22 @@ function renderSingleEntity(
         
         item.entity = entity;
         item.options = options;
-        
+
+        // Plugins with getDynamicPosition own position updates; do not overwrite posRef/primitive.position
+        // so the AnimationLoop is the single writer and movement is visible every frame.
+        const managed = entity.pluginId ? pluginManager.getPlugin(entity.pluginId) : undefined;
+        const pluginDrivesPosition = !!managed?.plugin.getDynamicPosition;
+
         if (hasNewData) {
-            // New data: reset position and extrapolation state
-            item.posRef = position;
             item.basePosition = undefined;
             item.velocityVector = undefined;
-            if (!Cartesian3.equals(item.primitive.position, position)) {
-                item.primitive.position = position;
+            if (!pluginDrivesPosition) {
+                item.posRef = position;
+                if (!Cartesian3.equals(item.primitive.position, position)) {
+                    item.primitive.position = position;
+                }
             }
         }
-        // else: keep the extrapolated position intact
         
         item.baseColor = color;
         item.baseOutlineColor = options.outlineColor ? Color.fromCssColorString(options.outlineColor) : Color.BLACK;
@@ -270,10 +276,11 @@ export async function renderEntitiesChunked(
     if (!points || !billboards || !labels) return Array.from(existingMap.values());
 
     const currentIds = new Set<string>();
+    const chunkSize = 1000;
 
     await globalChunkedProcessor.processChunked(
         visibleEntities,
-        1000, // Process 1000 items per chunk
+        chunkSize,
         (chunk) => {
             if (viewer.isDestroyed()) return;
             for (let i = 0; i < chunk.length; i++) {

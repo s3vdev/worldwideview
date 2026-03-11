@@ -194,9 +194,30 @@ class PluginManager {
         this.plugins.clear();
     }
 
+    /**
+     * Cheap fingerprint to detect when new entities are effectively the same as current.
+     * Sorted by id so API order changes do not trigger re-render (avoids aviation "respawn" every poll).
+     */
+    private entityFingerprint(entities: GeoEntity[], max: number = 8): string {
+        const len = entities.length;
+        const sorted = [...entities].sort((a, b) => (a.id || "").localeCompare(b.id || ""));
+        const head = sorted.slice(0, max).map(
+            (e) => `${e.id},${e.latitude?.toFixed(4)},${e.longitude?.toFixed(4)},${e.timestamp?.valueOf() ?? ""}`
+        ).join("|");
+        return `${len}:${head}`;
+    }
+
     private handleDataUpdate(pluginId: string, entities: GeoEntity[]): void {
         const managed = this.plugins.get(pluginId);
         if (!managed) return;
+
+        // Skip update when data is effectively unchanged to avoid re-render and plane icon flicker
+        if (managed.entities.length === entities.length && managed.entities.length > 0) {
+            if (this.entityFingerprint(managed.entities) === this.entityFingerprint(entities)) {
+                return;
+            }
+        }
+
         managed.entities = entities;
 
         cacheLayer.set(pluginId, entities, this.configCacheMaxAge);

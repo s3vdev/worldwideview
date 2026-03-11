@@ -23,6 +23,9 @@
 # artifacts
 /artifacts/
 
+# scripts
+/scripts/
+
 # production
 /build
 

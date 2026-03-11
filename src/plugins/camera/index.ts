@@ -7,8 +7,7 @@ import { CameraDetail } from "./CameraDetail";
 import { CameraSettings } from "./CameraSettings";
 import { useStore } from "@/core/state/store";
 import { SmartFetcher } from "@/core/data/SmartFetcher";
-import { parseInsecamCamera } from "./insecamStream";
-import { mapRawCamera } from "./cameraMapper";
+import { mapRawCamera, mapGeoJsonFeature } from "./cameraMapper";
 
 export class CameraPlugin implements WorldPlugin {
     id = "camera";
@@ -21,15 +20,13 @@ export class CameraPlugin implements WorldPlugin {
     private context: PluginContext | null = null;
     private sourceBuckets: Record<string, GeoEntity[]> = {};
     private lastActionId: number | null = null;
-    private insecamAbort: AbortController | null = null;
 
     async initialize(ctx: PluginContext): Promise<void> { this.context = ctx; }
-    destroy(): void { this.insecamAbort?.abort(); this.context = null; }
+    destroy(): void { this.context = null; }
 
     requiresConfiguration(settingsRaw: any): boolean {
         const s = { sourceType: "default", ...(settingsRaw || {}) };
         if (s.sourceType === "default") return false;
-        if (s.sourceType === "insecam" && !s.insecamCategory) return true;
         if (s.sourceType === "url" && !s.customUrl) return true;
         if (s.sourceType === "file" && !s.customData) return true;
         return false;
@@ -43,7 +40,6 @@ export class CameraPlugin implements WorldPlugin {
         const settings = { sourceType: "default", ...(raw || {}) };
 
         if (settings.action === "reset") {
-            this.insecamAbort?.abort();
             this.sourceBuckets = {};
             this.lastActionId = settings.actionId;
             return [];
@@ -58,8 +54,6 @@ export class CameraPlugin implements WorldPlugin {
         try {
             if (settings.sourceType === "default") {
                 await this.loadDefaultSource();
-            } else if (settings.sourceType === "insecam") {
-                await this.startInsecamStream(settings);
             } else if (settings.sourceType === "url") {
                 await this.loadUrlSource(settings);
             } else if (settings.sourceType === "file") {
@@ -74,12 +68,11 @@ export class CameraPlugin implements WorldPlugin {
     }
 
     private async loadDefaultSource(): Promise<void> {
-        const [jsonData] = await Promise.all([
-            SmartFetcher.fetchJson("/cameras.json"),
-            this.loadInsecamFromCache("rating"),
-        ]);
-        if (Array.isArray(jsonData)) {
-            this.sourceBuckets["default"] = jsonData.map((c, i) => mapRawCamera(c, i, "default"));
+        const geojson = await SmartFetcher.fetchJson("/public-cameras.json");
+        if (geojson && Array.isArray(geojson.features)) {
+            this.sourceBuckets["default"] = geojson.features.map(
+                (f: any, i: number) => mapGeoJsonFeature(f, i, "default"),
+            );
         }
         this.pushUpdate();
     }
@@ -97,34 +90,6 @@ export class CameraPlugin implements WorldPlugin {
     private loadFileSource(settings: any): void {
         if (!settings.customData || !Array.isArray(settings.customData)) return;
         this.sourceBuckets["file"] = settings.customData.map((c: any, i: number) => mapRawCamera(c, i, "file"));
-    }
-
-    private async startInsecamStream(settings: any): Promise<void> {
-        await this.loadInsecamFromCache(settings.insecamCategory || "rating");
-        this.pushUpdate();
-    }
-
-    /** Fetch insecam cameras via the cached API endpoint. */
-    private async loadInsecamFromCache(category: string): Promise<void> {
-        this.insecamAbort?.abort();
-        this.insecamAbort = new AbortController();
-
-        try {
-            const res = await fetch(
-                `/api/camera/insecam?category=${category}`,
-                { signal: this.insecamAbort.signal },
-            );
-            if (!res.ok) return;
-
-            const data = await res.json();
-            if (data.cameras && Array.isArray(data.cameras)) {
-                this.sourceBuckets["insecam"] = data.cameras.map((c: any, i: number) =>
-                    parseInsecamCamera(c, i)
-                );
-            }
-        } catch (err: any) {
-            if (err.name !== "AbortError") console.error("[CameraPlugin] Insecam fetch error:", err);
-        }
     }
 
     getPollingInterval(): number { return 3600000; }

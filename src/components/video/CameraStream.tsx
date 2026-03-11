@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { Play, Square, Loader2, AlertCircle, ExternalLink, Maximize2 } from "lucide-react";
 import { useStore } from "@/core/state/store";
+import { HlsPlayer } from "./HlsPlayer";
+import { isHlsUrl, isKnownVideoPlatform, getYouTubeEmbedUrl, getStreamErrorMessage } from "./streamUtils";
 
 interface CameraStreamProps {
     streamUrl: string;
@@ -14,104 +16,50 @@ interface CameraStreamProps {
 }
 
 export const CameraStream: React.FC<CameraStreamProps> = ({
-    streamUrl,
-    previewUrl,
-    isIframe = false,
-    label,
-    className = "",
-    id
+    streamUrl, previewUrl, isIframe = false, label, className = "", id,
 }) => {
     const { addFloatingStream } = useStore();
     const [isPlaying, setIsPlaying] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Reset playback when switching streams
-    useEffect(() => {
-        setIsPlaying(false);
-        setError(null);
-        setIsLoading(false);
-    }, [streamUrl]);
+    useEffect(() => { setIsPlaying(false); setError(null); setIsLoading(false); }, [streamUrl]);
 
     const handlePopOut = (e: React.MouseEvent) => {
         e.stopPropagation();
         addFloatingStream({
             id: id || `stream-${Math.random().toString(36).substr(2, 9)}`,
-            streamUrl,
-            isIframe,
-            label: label || "Camera Stream"
+            streamUrl, isIframe, label: label || "Camera Stream",
         });
         handleStop();
     };
 
     const handlePlay = (e?: React.MouseEvent) => {
-        e?.stopPropagation();
-        setError(null);
-        setIsLoading(true);
-        setIsPlaying(true);
+        e?.stopPropagation(); setError(null); setIsLoading(true); setIsPlaying(true);
     };
 
     const handleStop = (e?: React.MouseEvent) => {
-        e?.stopPropagation();
-        setIsPlaying(false);
-        setIsLoading(false);
-        setError(null);
-    };
-
-
-    const getYouTubeUrl = (url: string) => {
-        if (!url) return url;
-        if (url.includes("youtube.com") || url.includes("youtube-nocookie.com") || url.includes("youtu.be")) {
-            try {
-                const u = new URL(url.includes("youtu.be") ? url.replace("youtu.be/", "youtube.com/embed/") : url);
-                // Ensure it's an embed URL
-                if (u.pathname.startsWith("/watch")) {
-                    const videoId = u.searchParams.get("v");
-                    u.pathname = `/embed/${videoId}`;
-                    u.search = "";
-                }
-
-                // Add required parameters, but rely mostly on referrerPolicy
-                if (!u.searchParams.has("autoplay")) u.searchParams.set("autoplay", "1");
-                u.searchParams.set("enablejsapi", "1");
-
-                return u.toString();
-            } catch (e) {
-                return url;
-            }
-        }
-        return url;
-    };
-
-    const isKnownVideoPlatform = (url: string) => {
-        if (!url) return false;
-        const lower = url.toLowerCase();
-        return lower.includes("youtube.com") ||
-            lower.includes("youtu.be") ||
-            lower.includes("youtube-nocookie.com") ||
-            lower.includes("twitch.tv") ||
-            lower.includes("vimeo.com") ||
-            lower.includes("player.") ||
-            lower.includes("/player/") ||
-            lower.includes("webcamera.pl") ||
-            lower.includes(".html");
+        e?.stopPropagation(); setIsPlaying(false); setIsLoading(false); setError(null);
     };
 
     const renderStreamContent = () => {
-        const actualIsIframe = isIframe || isKnownVideoPlatform(streamUrl);
+        // HLS streams need a dedicated video player
+        if (isHlsUrl(streamUrl)) {
+            return (
+                <HlsPlayer
+                    src={streamUrl}
+                    onReady={() => setIsLoading(false)}
+                    onError={(msg) => { setError(msg); setIsLoading(false); }}
+                />
+            );
+        }
 
-        if (actualIsIframe) {
-            const finalIframeUrl = getYouTubeUrl(streamUrl); // Returns youtube embed or generic url
+        // Embeddable platforms (YouTube, Twitch, etc.)
+        if (isIframe || isKnownVideoPlatform(streamUrl)) {
             return (
                 <iframe
-                    src={finalIframeUrl}
-                    style={{
-                        position: "absolute",
-                        inset: 0,
-                        width: "100%",
-                        height: "100%",
-                        border: "none"
-                    }}
+                    src={getYouTubeEmbedUrl(streamUrl)}
+                    style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
                     onLoad={() => setIsLoading(false)}
                     onError={() => {
                         setError("Stream integration failed: The provider may have blocked embedding this video or the source is unavailable.");
@@ -124,118 +72,41 @@ export const CameraStream: React.FC<CameraStreamProps> = ({
             );
         }
 
+        // Fallback: static image / MJPEG snapshot
         return (
             <img
                 src={streamUrl}
                 alt={label || "Live camera stream"}
-                style={{
-                    maxWidth: "100%",
-                    maxHeight: "100%",
-                    objectFit: "contain"
-                }}
+                style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
                 onLoad={() => setIsLoading(false)}
-                onError={() => {
-                    let errorMessage = "Stream Failed: The stream might be offline, unreachable due to CORS restrictions, or restricted by the provider.";
-
-                    if (streamUrl.startsWith('http://') && typeof window !== 'undefined' && window.location.protocol === 'https:') {
-                        errorMessage = "Mixed Content Error: Connection blocked because the stream uses insecure HTTP on a secure HTTPS site.";
-                    } else if (streamUrl.endsWith('.m3u8') || streamUrl.includes('.m3u8?')) {
-                        errorMessage = "Unsupported Format: HLS streams (.m3u8) require a dedicated player and cannot be displayed directly as an image.";
-                    }
-
-                    setError(errorMessage);
-                    setIsLoading(false);
-                }}
+                onError={() => { setError(getStreamErrorMessage(streamUrl)); setIsLoading(false); }}
             />
         );
     };
 
+    const overlayBtn = (onClick: (e: React.MouseEvent) => void, title: string, children: React.ReactNode, size = 28) => (
+        <button
+            onClick={onClick}
+            style={{ display: "flex", alignItems: "center", justifyContent: "center", width: `${size}px`, height: `${size}px`, borderRadius: size < 28 ? "4px" : "50%", background: "rgba(0,0,0,0.6)", color: "rgba(255,255,255,0.7)", border: "none", cursor: "pointer", backdropFilter: "blur(4px)" }}
+            title={title}
+        >{children}</button>
+    );
+
     return (
-        <div
-            className={className}
-            style={{
-                position: "relative",
-                width: "100%",
-                aspectRatio: "16/9",
-                backgroundColor: "#050505",
-                borderRadius: "8px",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
-                overflow: "hidden",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center"
-            }}
-        >
+        <div className={className} style={{ position: "relative", width: "100%", aspectRatio: "16/9", backgroundColor: "#050505", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.1)", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
             {!isPlaying ? (
-                <div
-                    style={{
-                        position: "absolute",
-                        inset: 0,
-                        cursor: "pointer",
-                        zIndex: 10,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center"
-                    }}
-                    onClick={handlePlay}
-                >
+                <div style={{ position: "absolute", inset: 0, cursor: "pointer", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={handlePlay}>
                     {previewUrl && (
-                        <img
-                            src={previewUrl}
-                            alt={label || "Camera preview"}
-                            style={{
-                                position: "absolute",
-                                inset: 0,
-                                width: "100%",
-                                height: "100%",
-                                objectFit: "cover",
-                                opacity: 0.6
-                            }}
-                            onError={(e) => {
-                                (e.target as HTMLImageElement).src = "https://placehold.co/640x480?text=No+Preview+Available";
-                            }}
-                        />
+                        <img src={previewUrl} alt={label || "Camera preview"} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.6 }}
+                            onError={(e) => { (e.target as HTMLImageElement).src = "https://placehold.co/640x480?text=No+Preview+Available"; }} />
                     )}
                     <div style={{ position: "relative", zIndex: 11 }}>
-                        <div
-                            style={{
-                                display: "flex",
-                                width: "48px",
-                                height: "48px",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                borderRadius: "50%",
-                                backgroundColor: "rgba(37, 99, 235, 0.9)",
-                                color: "white",
-                                boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
-                                border: "1px solid rgba(255,255,255,0.2)"
-                            }}
-                        >
+                        <div style={{ display: "flex", width: "48px", height: "48px", alignItems: "center", justifyContent: "center", borderRadius: "50%", backgroundColor: "rgba(37,99,235,0.9)", color: "white", boxShadow: "0 4px 12px rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.2)" }}>
                             <Play size={20} style={{ fill: "currentColor", marginLeft: "2px" }} />
                         </div>
                     </div>
-
-                    {/* Pop-out button on preview */}
                     <div style={{ position: "absolute", top: "8px", right: "8px", zIndex: 12 }}>
-                        <button
-                            onClick={handlePopOut}
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                width: "24px",
-                                height: "24px",
-                                borderRadius: "4px",
-                                background: "rgba(0,0,0,0.4)",
-                                color: "rgba(255,255,255,0.7)",
-                                border: "none",
-                                cursor: "pointer",
-                                backdropFilter: "blur(4px)"
-                            }}
-                            title="Pop out video"
-                        >
-                            <Maximize2 size={12} />
-                        </button>
+                        {overlayBtn(handlePopOut, "Pop out video", <Maximize2 size={12} />, 24)}
                     </div>
                 </div>
             ) : (
@@ -253,39 +124,16 @@ export const CameraStream: React.FC<CameraStreamProps> = ({
                         <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.9)", padding: "16px", textAlign: "center", zIndex: 30 }}>
                             <AlertCircle style={{ color: "#ef4444", width: "24px", height: "24px", marginBottom: "8px" }} />
                             <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.7)", maxWidth: "200px", lineHeight: "1.5" }}>{error}</p>
-                            <button
-                                onClick={handleStop}
-                                style={{ marginTop: "12px", fontSize: "10px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "1px", color: "#60a5fa", background: "none", border: "none", cursor: "pointer" }}
-                            >
-                                Reset Stream
-                            </button>
+                            <button onClick={handleStop} style={{ marginTop: "12px", fontSize: "10px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "1px", color: "#60a5fa", background: "none", border: "none", cursor: "pointer" }}>Reset Stream</button>
                         </div>
                     )}
 
                     <div style={{ position: "absolute", top: "8px", right: "8px", display: "flex", gap: "6px", zIndex: 40 }}>
-                        <button
-                            onClick={handlePopOut}
-                            style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "28px", height: "28px", borderRadius: "50%", background: "rgba(0,0,0,0.6)", color: "rgba(255,255,255,0.6)", border: "none", cursor: "pointer" }}
-                            title="Pop out video"
-                        >
-                            <Maximize2 size={12} />
-                        </button>
-                        <a
-                            href={streamUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "28px", height: "28px", borderRadius: "50%", background: "rgba(0,0,0,0.6)", color: "rgba(255,255,255,0.6)", textDecoration: "none" }}
-                            title="Open in new tab"
-                        >
+                        {overlayBtn(handlePopOut, "Pop out video", <Maximize2 size={12} />)}
+                        <a href={streamUrl} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "28px", height: "28px", borderRadius: "50%", background: "rgba(0,0,0,0.6)", color: "rgba(255,255,255,0.6)", textDecoration: "none" }} title="Open in new tab">
                             <ExternalLink size={12} />
                         </a>
-                        <button
-                            onClick={handleStop}
-                            style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "28px", height: "28px", borderRadius: "50%", background: "rgba(0,0,0,0.6)", color: "rgba(255,255,255,0.6)", border: "none", cursor: "pointer" }}
-                            title="Stop Stream"
-                        >
-                            <Square size={10} style={{ fill: "currentColor" }} />
-                        </button>
+                        {overlayBtn(handleStop, "Stop Stream", <Square size={10} style={{ fill: "currentColor" }} />)}
                     </div>
                 </div>
             )}

@@ -31,11 +31,11 @@ interface AdsbFiAircraft {
 }
 
 function militaryAltitudeToColor(altFeet: number | null): string {
-    if (altFeet === null || altFeet <= 0) return "#6b8e23"; // olive — ground
-    if (altFeet < 10000) return "#8fbc8f";   // dark sea green — low
-    if (altFeet < 25000) return "#daa520";   // goldenrod — medium
-    if (altFeet < 40000) return "#cd853f";   // peru — high
-    return "#b22222";                         // firebrick — very high
+    if (altFeet === null || altFeet <= 0) return "#39ff14"; // neon green — ground
+    if (altFeet < 10000) return "#ff6f00";   // bright orange — low
+    if (altFeet < 25000) return "#ff1744";   // vivid red — medium
+    if (altFeet < 40000) return "#ff4081";   // hot magenta — high
+    return "#ffea00";                         // electric yellow — very high
 }
 
 function feetToMeters(feet: number): number {
@@ -113,7 +113,7 @@ export class MilitaryPlugin implements WorldPlugin {
 
     getLayerConfig(): LayerConfig {
         return {
-            color: "#6b8e23",
+            color: "#ff6f00",
             clusterEnabled: true,
             clusterDistance: 40,
             maxEntities: 3000,
@@ -145,7 +145,7 @@ export class MilitaryPlugin implements WorldPlugin {
             showTrail: true,
             trailDurationSec: 60,
             trailStepSec: 5,
-            trailColor: "#daa520",
+            trailColor: "#ffea00",
             flyToOffsetMultiplier: 3,
             flyToBaseDistance: 30000,
         };

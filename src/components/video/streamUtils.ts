@@ -22,6 +22,9 @@ export function isKnownVideoPlatform(url: string): boolean {
         lower.includes("player.") ||
         lower.includes("/player/") ||
         lower.includes("webcamera.pl") ||
+        lower.includes("ivideon.com") ||
+        lower.includes("rtsp.me") ||
+        lower.includes("bnu.tv") ||
         lower.includes(".html")
     );
 }

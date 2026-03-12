@@ -10,6 +10,7 @@ import { PluginIcon } from "@/components/common/PluginIcon";
 import { FavoritesTab } from "./FavoritesTab";
 import { ImportPanel } from "@/plugins/geojson/ImportPanel";
 import "@/plugins/geojson/geojson-importer.css";
+import { DiscordIcon } from "@/components/common/DiscordIcon";
 
 
 export function LayerPanel() {
@@ -163,6 +164,15 @@ export function LayerPanel() {
                             })}
                         </div>
                     ))}
+                    <a
+                        href="https://discord.gg/k3F2N4eKnr"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="discord-sidebar-link"
+                    >
+                        <DiscordIcon size={18} />
+                        <span>Join our Discord</span>
+                    </a>
                 </>
             )}
 
@@ -177,6 +187,7 @@ export function LayerPanel() {
             {activeTab === "import" && (
                 <ImportPanel />
             )}
+
         </aside>
     );
 }

@@ -5,7 +5,7 @@ import { useStore } from "@/core/state/store";
 import { dataBus } from "@/core/data/DataBus";
 import { pluginManager } from "@/core/plugins/PluginManager";
 import { Globe } from "lucide-react";
-import { DiscordIcon } from "@/components/common/DiscordIcon";
+
 import { SearchBar } from "./SearchBar";
 import { useIsMobile } from "@/core/hooks/useIsMobile";
 
@@ -58,15 +58,7 @@ export function Header() {
                 </div>
 
                 <div className="header__actions">
-                    <a
-                        href="https://discord.gg/k3F2N4eKnr"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn btn--glow discord-link"
-                        title="Join our Discord"
-                    >
-                        <DiscordIcon size={16} />
-                    </a>
+
                     <div className="status-badge">
                         <span className="status-badge__dot" />
                         LIVE
@@ -123,16 +115,7 @@ export function Header() {
                 </div>
                 <div className="header__actions">
                     <div style={{ width: 1, height: 20, background: "var(--border-subtle)" }} />
-                    <a
-                        href="https://discord.gg/k3F2N4eKnr"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn btn--glow discord-link"
-                        title="Join our Discord"
-                    >
-                        <DiscordIcon size={16} />
-                        <span>Discord</span>
-                    </a>
+
                     <div className="status-badge">
                         <span className="status-badge__dot" />
                         LIVE

@@ -201,6 +201,44 @@ export function EntityInfoCard() {
                     </>
                 )}
 
+                {/* Internet Outages: country, severity, time, source */}
+                {hoveredEntity.pluginId === "internetOutages" && (
+                    <>
+                        {(hoveredEntity.properties?.countryName as string) && (
+                            <div className="entity-info-card__prop">
+                                <span className="entity-info-card__prop-key">Country</span>
+                                <span className="entity-info-card__prop-value">{String(hoveredEntity.properties.countryName)}</span>
+                            </div>
+                        )}
+                        {(hoveredEntity.properties?.severity as string) && (
+                            <div className="entity-info-card__prop">
+                                <span className="entity-info-card__prop-key">Severity</span>
+                                <span className="entity-info-card__prop-value">{String(hoveredEntity.properties.severity)}</span>
+                            </div>
+                        )}
+                        {(hoveredEntity.properties?.startTime as string) && (
+                            <div className="entity-info-card__prop">
+                                <span className="entity-info-card__prop-key">Start</span>
+                                <span className="entity-info-card__prop-value">
+                                    {new Date(String(hoveredEntity.properties.startTime)).toLocaleString()}
+                                </span>
+                            </div>
+                        )}
+                        {(hoveredEntity.properties?.endTime as string) && (
+                            <div className="entity-info-card__prop">
+                                <span className="entity-info-card__prop-key">End</span>
+                                <span className="entity-info-card__prop-value">
+                                    {new Date(String(hoveredEntity.properties.endTime)).toLocaleString()}
+                                </span>
+                            </div>
+                        )}
+                        <div className="entity-info-card__prop">
+                            <span className="entity-info-card__prop-key">Source</span>
+                            <span className="entity-info-card__prop-value">{String(hoveredEntity.properties?.source ?? "IODA")}</span>
+                        </div>
+                    </>
+                )}
+
                 {/* Satellite-specific semantics */}
                 {isSatellite && (
                     <>

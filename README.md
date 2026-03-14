@@ -34,6 +34,9 @@ As a real-time situational awareness platform, it turns raw geospatial signals�
 - **Ship icon** with heading orientation
 - **Demo data** (AIS integration planned)
 
+### Internet Outages
+- **IODA-based country-level outage monitoring** via IODA API v2; serverseitige Route `/api/internet-outages`, Caching 5 Min; betroffene Länder als farbige Flächen (Severity: gelb/orange/rot), Join mit `borders.geojson` (iso_a2).
+
 ### GPS Jamming
 - **Real data** from gpsjam.org (H3 hexagon polygons)
 - **Date resolution**: manifest or fallback (today → previous days) for latest available dataset

@@ -23,6 +23,7 @@ import { EarthquakePlugin } from "@/plugins/earthquakes";
 import { SatellitesPlugin } from "@/plugins/satellites";
 import { MilitaryPlugin } from "@/plugins/military";
 import { MilitaryBasesPlugin } from "@/plugins/militaryBases";
+import { InternetOutagesPlugin } from "@/plugins/internetOutages";
 import { useStore } from "@/core/state/store";
 import { dataBus } from "@/core/data/DataBus";
 import { PanelToggleArrows } from "@/components/layout/PanelToggleArrows";
@@ -111,6 +112,7 @@ export function AppShell() {
             pluginRegistry.register(new SatellitesPlugin());
             pluginRegistry.register(new MilitaryPlugin());
             pluginRegistry.register(new MilitaryBasesPlugin());
+            pluginRegistry.register(new InternetOutagesPlugin());
 
             await pluginManager.init();
 

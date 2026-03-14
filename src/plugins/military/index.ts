@@ -43,6 +43,11 @@ function feetToMeters(feet: number): number {
     return feet * 0.3048;
 }
 
+/** Knots to m/s for extrapolation (AnimationLoop expects entity.speed in m/s). */
+function knotsToMs(knots: number): number {
+    return knots * 0.514444;
+}
+
 export class MilitaryPlugin implements WorldPlugin {
     id = "military";
     name = "Military Aviation";
@@ -76,6 +81,7 @@ export class MilitaryPlugin implements WorldPlugin {
                     const altMeters = altFeet !== null ? feetToMeters(altFeet) : null;
                     const isOnGround = ac.alt_baro === "ground";
 
+                    const groundSpeedKts = typeof ac.gs === "number" ? ac.gs : 0;
                     return {
                         id: `military-${ac.hex}`,
                         pluginId: "military",
@@ -83,7 +89,7 @@ export class MilitaryPlugin implements WorldPlugin {
                         longitude: ac.lon!,
                         altitude: altMeters !== null ? altMeters * 10 : 0,
                         heading: ac.track ?? undefined,
-                        speed: ac.gs ?? undefined,
+                        speed: knotsToMs(groundSpeedKts),
                         timestamp: new Date(),
                         label: ac.flight?.trim() || ac.r || ac.hex,
                         properties: {

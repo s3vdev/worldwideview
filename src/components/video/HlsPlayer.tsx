@@ -29,6 +29,8 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({ src, onReady, onError }) =
         const video = videoRef.current;
         if (!video || !src) return;
 
+        let cancelled = false;
+
         // Safari / iOS have native HLS support
         if (video.canPlayType("application/vnd.apple.mpegurl")) {
             video.src = src;
@@ -38,11 +40,15 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({ src, onReady, onError }) =
                 () => onError?.("Native HLS playback failed. The stream may be offline or blocked by CORS."),
                 { once: true },
             );
-            return () => {};
+            return () => {
+                cancelled = true;
+                video.src = "";
+            };
         }
 
         // Dynamically import hls.js for non-Safari browsers
         import("hls.js").then((mod) => {
+            if (cancelled) return;
             const Hls = mod.default;
 
             if (!Hls.isSupported()) {
@@ -56,12 +62,17 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({ src, onReady, onError }) =
                 enableWorker: true,
                 lowLatencyMode: true,
             });
+            if (cancelled) {
+                hls.destroy();
+                return;
+            }
             hlsRef.current = hls;
 
             hls.loadSource(src);
             hls.attachMedia(video);
 
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                if (cancelled) return;
                 onReady?.();
                 video.play().catch(() => {
                     // Autoplay may be blocked — not critical
@@ -77,10 +88,13 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({ src, onReady, onError }) =
                 }
             });
         }).catch(() => {
-            onError?.("Failed to load HLS player library.");
+            if (!cancelled) onError?.("Failed to load HLS player library.");
         });
 
-        return cleanup;
+        return () => {
+            cancelled = true;
+            cleanup();
+        };
     }, [src, onReady, onError, cleanup]);
 
     return (

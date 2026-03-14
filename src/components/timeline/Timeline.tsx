@@ -18,7 +18,7 @@ export function Timeline() {
     const timeRange = useStore((s) => s.timeRange);
 
     const [mounted, setMounted] = useState(false);
-    const [isExpanded, setIsExpanded] = useState(true);
+    const [isExpanded, setIsExpanded] = useState(false);
 
     useEffect(() => {
         setMounted(true);

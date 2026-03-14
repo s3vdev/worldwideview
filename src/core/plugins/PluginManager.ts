@@ -145,7 +145,11 @@ class PluginManager {
         try {
             managed.context.timeRange = timeRange;
             const entities = await managed.plugin.fetch(timeRange);
-            if (managed.enabled) this.handleDataUpdate(pluginId, entities);
+            const current = managed.context.timeRange;
+            const sameRange =
+                current.start.getTime() === timeRange.start.getTime() &&
+                current.end.getTime() === timeRange.end.getTime();
+            if (managed.enabled && sameRange) this.handleDataUpdate(pluginId, entities);
         } finally {
             useStore.getState().setLayerLoading(pluginId, false);
         }

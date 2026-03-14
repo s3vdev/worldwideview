@@ -114,23 +114,28 @@ function parseOutagesFromResponse(data: unknown): { outages: InternetOutageItem[
     return { outages: Array.from(byCountry.values()), rawList: list };
 }
 
-export async function GET() {
-    const cached = get<{ outages: InternetOutageItem[]; debug?: string }>(CACHE_KEY);
+export async function GET(request: Request) {
+    const url = request.url ? new URL(request.url) : null;
+    const fromParam = url?.searchParams.get("from");
+    const untilParam = url?.searchParams.get("until");
+
+    const now = Math.floor(Date.now() / 1000);
+    const fromNum = fromParam != null ? Number(fromParam) : NaN;
+    const untilNum = untilParam != null ? Number(untilParam) : NaN;
+    const useParams = Number.isFinite(fromNum) && Number.isFinite(untilNum);
+    const fromSec = useParams ? String(Math.floor(fromNum)) : String(now - 6 * 3600);
+    const untilSec = useParams ? String(Math.floor(untilNum)) : String(now);
+
+    const cacheKey = `${CACHE_KEY}:${fromSec}:${untilSec}`;
+    const cached = get<{ outages: InternetOutageItem[]; debug?: string }>(cacheKey);
     if (cached?.outages && Array.isArray(cached.outages)) {
         return NextResponse.json(cached);
     }
-
-    // IODA doc: from + until required, Unix timestamp in seconds (not milliseconds)
-    const now = Math.floor(Date.now() / 1000);
-    const fromSec = String(now - 6 * 3600);
-    const untilSec = String(now);
-    const alertsFromSec = String(now - 24 * 3600);
 
     let outages: InternetOutageItem[] = [];
     let debug = "no data";
 
     try {
-        // Request country-level events only (IODA doc: entityType=country; omit entityCode to get all countries)
         const eventsUrl = `${IODA_BASE}/outages/events?from=${fromSec}&until=${untilSec}&entityType=country&limit=500`;
         console.log("[API/internet-outages] GET", eventsUrl);
 
@@ -150,6 +155,9 @@ export async function GET() {
                 parsed.rawList.length === 0
                     ? "ioda-events empty (no events in window)"
                     : `ioda-events raw ${parsed.rawList.length} → ${outages.length} countries`;
+            if (process.env.NODE_ENV === "development" && parsed.rawList.length > 0) {
+                console.debug("[API/internet-outages] loaded events:", parsed.rawList.length, "→ countries:", outages.length);
+            }
             if (parsed.rawList.length > 0) {
                 const first = parsed.rawList[0] as Record<string, unknown>;
                 const keys = first ? Object.keys(first).join(", ") : "";
@@ -161,8 +169,8 @@ export async function GET() {
             const snippet = (await res.text()).slice(0, 300);
             console.warn("[API/internet-outages] events 4xx/5xx body:", snippet);
 
-            // Optional fallback: alerts with 24h window (same param names: from, until in Unix seconds)
-            const alertsUrl = `${IODA_BASE}/outages/alerts?from=${alertsFromSec}&until=${untilSec}&limit=500`;
+            // Alerts fallback: same from/until as events for consistent time window and playback
+            const alertsUrl = `${IODA_BASE}/outages/alerts?from=${fromSec}&until=${untilSec}&limit=500`;
             const fallbackRes = await fetch(alertsUrl, {
                 cache: "no-store",
                 headers: { Accept: "application/json" },
@@ -192,6 +200,6 @@ export async function GET() {
     }
 
     const payload = { outages, source: "IODA", debug };
-    set(CACHE_KEY, payload, CACHE_TTL_MS);
+    set(cacheKey, payload, CACHE_TTL_MS);
     return NextResponse.json(payload);
 }

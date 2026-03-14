@@ -145,9 +145,11 @@ export class InternetOutagesPlugin implements WorldPlugin {
         console.log("[InternetOutagesPlugin] Destroyed");
     }
 
-    async fetch(_timeRange: TimeRange): Promise<GeoEntity[]> {
+    async fetch(timeRange: TimeRange): Promise<GeoEntity[]> {
         try {
-            const res = await fetch("/api/internet-outages");
+            const fromSec = Math.floor(timeRange.start.getTime() / 1000);
+            const untilSec = Math.floor(timeRange.end.getTime() / 1000);
+            const res = await fetch(`/api/internet-outages?from=${fromSec}&until=${untilSec}`);
             if (!res.ok) {
                 console.error(`[InternetOutagesPlugin] API returned ${res.status}`);
                 return [];
@@ -171,22 +173,22 @@ export class InternetOutagesPlugin implements WorldPlugin {
                 const positions = featureToPositions(feature);
                 if (!positions || positions.length < 3) continue;
                 const centroid = polygonCentroid(positions);
-                const startStr = o.startTime ? new Date(o.startTime).toISOString() : "—";
-                const endStr = o.endTime ? new Date(o.endTime).toISOString() : "—";
+                const startTime = o.startTime ?? null;
+                const endTime = o.endTime ?? null;
                 entities.push({
                     id: `internet-outages-${code}`,
                     pluginId: "internetOutages",
                     latitude: centroid.latitude,
                     longitude: centroid.longitude,
                     altitude: 0,
-                    timestamp: o.startTime ? new Date(o.startTime) : new Date(),
+                    timestamp: startTime ? new Date(startTime) : new Date(),
                     label: `${o.name} (${o.severity})`,
                     properties: {
                         countryCode: code,
                         countryName: o.name,
                         severity: o.severity,
-                        startTime: o.startTime,
-                        endTime: o.endTime,
+                        startTime,
+                        endTime,
                         entityType: o.entityType,
                         source: o.source ?? "IODA",
                         positions,

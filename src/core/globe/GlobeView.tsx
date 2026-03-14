@@ -47,6 +47,7 @@ export default function GlobeView() {
     const entitiesByPlugin = useStore((s) => s.entitiesByPlugin);
     const layers = useStore((s) => s.layers);
     const selectedEntity = useStore((s) => s.selectedEntity);
+    const currentTime = useStore((s) => s.currentTime);
     const showLabels = layers["borders"]?.enabled ?? false;
     const sceneSettings = {
         showFps: useStore((s) => s.mapConfig.showFps),
@@ -91,9 +92,36 @@ export default function GlobeView() {
     // Compute visible & filtered entities
     const visibleEntities = useMemo(() => {
         const result: Array<{ entity: GeoEntity; options: CesiumEntityOptions }> = [];
+        const nowMs = currentTime.getTime();
+
         pluginManager.getAllPlugins().forEach((managed) => {
             if (!layers[managed.plugin.id]?.enabled) return;
-            const entities = entitiesByPlugin[managed.plugin.id] || [];
+            let entities = entitiesByPlugin[managed.plugin.id] || [];
+
+            if (managed.plugin.id === "internetOutages") {
+                const loadedCount = entities.length;
+                entities = entities.filter((entity) => {
+                    const startTime = entity.properties?.startTime;
+                    const endTime = entity.properties?.endTime;
+                    if (startTime == null || endTime == null) return false;
+                    const startMs = typeof startTime === "string" ? new Date(startTime).getTime() : (startTime as Date)?.getTime?.();
+                    const endMs = typeof endTime === "string" ? new Date(endTime).getTime() : (endTime as Date)?.getTime?.();
+                    if (Number.isNaN(startMs) || Number.isNaN(endMs)) return false;
+                    return nowMs >= startMs && nowMs <= endMs;
+                });
+                const visibleCount = entities.length;
+                if (process.env.NODE_ENV === "development" && loadedCount > 0) {
+                    console.debug(
+                        "[internetOutages] loaded:",
+                        loadedCount,
+                        "visible (currentTime in range):",
+                        visibleCount,
+                        "discarded:",
+                        loadedCount - visibleCount
+                    );
+                }
+            }
+
             const defs = managed.plugin.getFilterDefinitions?.() || [];
             const active = filters[managed.plugin.id] || {};
             applyFilters(entities, defs, active).forEach((entity) => {
@@ -115,7 +143,7 @@ export default function GlobeView() {
         }
         
         return result;
-    }, [layers, entitiesByPlugin, filters, selectedEntity]);
+    }, [layers, entitiesByPlugin, filters, selectedEntity, currentTime]);
 
     // Imagery & Scene Management Hooks
     useImageryManager(viewerRef.current);

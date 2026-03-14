@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Map } from "lucide-react";
 
 import { useStore } from "@/core/state/store";
 import { useIsMobile } from "@/core/hooks/useIsMobile";
@@ -156,6 +156,16 @@ export function LayerPanel() {
                             })}
                         </div>
                     ))}
+                    <a
+                        href="https://strikemap.live/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="external-sidebar-link"
+                        aria-label="Open StrikeMap in a new tab"
+                    >
+                        <Map size={18} />
+                        <span>Open StrikeMap</span>
+                    </a>
                 </>
             )}
 

@@ -17,9 +17,8 @@ As a real-time situational awareness platform, it turns raw geospatial signalsâ€
 - **Filters**: Military status, country, altitude, speed
 
 ### Military Aviation
-- **Separate plugin**: real-time military aircraft via **adsb.fi** (dedicated layer, independent of OpenSky)
-- **Own data source** and API route (`/api/military`), server-side polling with backoff
-- **Visual**: military plane icon, altitude-based color coding
+- **Military Flights (adsb.fi)**: live military aircraft positions; separate plugin, API route `/api/military`, server-side polling with backoff; military plane icon, altitude-based color coding
+- **Military Bases**: static military installation dataset (GeoJSON); local `/military_bases.geojson`; point markers, no polling; name, type, country/operator in details
 
 ### Satellites
 - **Live orbital tracking** with TLE propagation using satellite.js

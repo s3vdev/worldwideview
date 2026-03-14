@@ -177,6 +177,30 @@ export function EntityInfoCard() {
                     </div>
                 )}
 
+                {/* Military Bases: type / country / operator */}
+                {hoveredEntity.pluginId === "militaryBases" && (
+                    <>
+                        {(hoveredEntity.properties?.type as string) && (
+                            <div className="entity-info-card__prop">
+                                <span className="entity-info-card__prop-key">Type</span>
+                                <span className="entity-info-card__prop-value">{String(hoveredEntity.properties.type)}</span>
+                            </div>
+                        )}
+                        {(hoveredEntity.properties?.country as string) && (
+                            <div className="entity-info-card__prop">
+                                <span className="entity-info-card__prop-key">Country</span>
+                                <span className="entity-info-card__prop-value">{String(hoveredEntity.properties.country)}</span>
+                            </div>
+                        )}
+                        {(hoveredEntity.properties?.operator as string) && (
+                            <div className="entity-info-card__prop">
+                                <span className="entity-info-card__prop-key">Operator</span>
+                                <span className="entity-info-card__prop-value">{String(hoveredEntity.properties.operator)}</span>
+                            </div>
+                        )}
+                    </>
+                )}
+
                 {/* Satellite-specific semantics */}
                 {isSatellite && (
                     <>

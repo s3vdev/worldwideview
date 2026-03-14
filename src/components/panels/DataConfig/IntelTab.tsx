@@ -55,6 +55,10 @@ export function IntelTab() {
 
     const isFavorited = favorites.some((f) => f.id === selectedEntity.id);
 
+    // Prefer label; for militaryBases/others avoid showing "Unknown" — use properties.name/type or id
+    const rawTitle = selectedEntity.label || (selectedEntity.properties?.name as string)?.trim() || (selectedEntity.properties?.type as string) || selectedEntity.id;
+    const displayTitle = (rawTitle && String(rawTitle).toLowerCase() !== "unknown") ? rawTitle : (selectedEntity.properties?.type as string) || selectedEntity.id;
+
     return (
         <div className="intel-panel__entity">
             <div className="intel-panel__entity-header">
@@ -63,7 +67,7 @@ export function IntelTab() {
                 </span>
                 <div style={{ flex: 1 }}>
                     <div className="intel-panel__entity-title">
-                        {selectedEntity.label || selectedEntity.id}
+                        {displayTitle}
                     </div>
                     <div className="intel-panel__entity-subtitle">{pluginName}</div>
                 </div>

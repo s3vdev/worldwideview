@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     try {
         const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(
             placeId
-        )}&fields=geometry,name,type&key=${apiKey}`;
+        )}&fields=geometry,name,types,formatted_address&key=${apiKey}`;
 
         const response = await fetch(url);
         const data = await response.json();
@@ -51,6 +51,7 @@ export async function GET(request: Request) {
             lon: location.lng,
             name: data.result.name,
             types: data.result.types || [],
+            formatted_address: data.result.formatted_address ?? undefined,
         };
         cache.set(cacheId, { data: result, expiresAt: Date.now() + TTL_MS });
         return NextResponse.json(result);

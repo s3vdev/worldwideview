@@ -1,5 +1,6 @@
 import {
     Cartesian3,
+    EasingFunction,
     Math as CesiumMath,
 } from "cesium";
 import type { Viewer as CesiumViewer } from "cesium";
@@ -31,7 +32,8 @@ export function flyToPreset(viewer: CesiumViewer, presetId: string): void {
             pitch: CesiumMath.toRadians(preset.pitch),
             roll: 0,
         },
-        duration: 2.5,
+        duration: 3.0,
+        easingFunction: EasingFunction.QUINTIC_IN_OUT,
     });
 }
 
@@ -56,6 +58,7 @@ export function flyToPosition(
             roll: 0,
         },
         duration,
+        easingFunction: EasingFunction.QUINTIC_IN_OUT,
     });
 }
 

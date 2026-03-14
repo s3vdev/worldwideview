@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import type { Viewer as CesiumViewer } from "cesium";
-import { Cartesian3, Ellipsoid, Math as CesiumMath, Transforms, Matrix4 } from "cesium";
+import { Cartesian3, EasingFunction, Ellipsoid, Math as CesiumMath, Transforms, Matrix4 } from "cesium";
 import { dataBus } from "@/core/data/DataBus";
 
 export function useCameraActions(viewer: CesiumViewer | null, isReady: boolean) {
@@ -108,7 +108,8 @@ export function useCameraActions(viewer: CesiumViewer | null, isReady: boolean) 
                 viewer.camera.flyTo({
                     destination: destination,
                     orientation: orientation,
-                    duration: 1.5,
+                    duration: 2.0,
+                    easingFunction: EasingFunction.QUINTIC_IN_OUT,
                     complete: () => {
                         dataBus.emit("showLocationPin", {});
                     },

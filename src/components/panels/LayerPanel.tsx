@@ -8,6 +8,7 @@ import { useIsMobile } from "@/core/hooks/useIsMobile";
 import { pluginManager } from "@/core/plugins/PluginManager";
 import { ImageryPicker } from "./ImageryPicker";
 import { PluginIcon } from "@/components/common/PluginIcon";
+import { DiscordIcon } from "@/components/common/DiscordIcon";
 import { FavoritesTab } from "./FavoritesTab";
 
 
@@ -156,6 +157,15 @@ export function LayerPanel() {
                             })}
                         </div>
                     ))}
+                    <a
+                        href="https://discord.gg/k3F2N4eKnr"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="discord-sidebar-link"
+                    >
+                        <DiscordIcon size={18} />
+                        <span>Join our Discord</span>
+                    </a>
                 </>
             )}
 

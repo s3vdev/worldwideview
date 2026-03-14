@@ -48,6 +48,7 @@ export default function GlobeView() {
     const layers = useStore((s) => s.layers);
     const selectedEntity = useStore((s) => s.selectedEntity);
     const currentTime = useStore((s) => s.currentTime);
+    const isPlaybackMode = useStore((s) => s.isPlaybackMode);
     const showLabels = layers["borders"]?.enabled ?? false;
     const sceneSettings = {
         showFps: useStore((s) => s.mapConfig.showFps),
@@ -100,25 +101,27 @@ export default function GlobeView() {
 
             if (managed.plugin.id === "internetOutages") {
                 const loadedCount = entities.length;
-                entities = entities.filter((entity) => {
-                    const startTime = entity.properties?.startTime;
-                    const endTime = entity.properties?.endTime;
-                    if (startTime == null || endTime == null) return false;
-                    const startMs = typeof startTime === "string" ? new Date(startTime).getTime() : (startTime as Date)?.getTime?.();
-                    const endMs = typeof endTime === "string" ? new Date(endTime).getTime() : (endTime as Date)?.getTime?.();
-                    if (Number.isNaN(startMs) || Number.isNaN(endMs)) return false;
-                    return nowMs >= startMs && nowMs <= endMs;
-                });
-                const visibleCount = entities.length;
-                if (process.env.NODE_ENV === "development" && loadedCount > 0) {
-                    console.debug(
-                        "[internetOutages] loaded:",
-                        loadedCount,
-                        "visible (currentTime in range):",
-                        visibleCount,
-                        "discarded:",
-                        loadedCount - visibleCount
-                    );
+                if (isPlaybackMode) {
+                    entities = entities.filter((entity) => {
+                        const startTime = entity.properties?.startTime;
+                        const endTime = entity.properties?.endTime;
+                        if (startTime == null || endTime == null) return false;
+                        const startMs = typeof startTime === "string" ? new Date(startTime).getTime() : (startTime as Date)?.getTime?.();
+                        const endMs = typeof endTime === "string" ? new Date(endTime).getTime() : (endTime as Date)?.getTime?.();
+                        if (Number.isNaN(startMs) || Number.isNaN(endMs)) return false;
+                        return nowMs >= startMs && nowMs <= endMs;
+                    });
+                    const visibleCount = entities.length;
+                    if (process.env.NODE_ENV === "development" && loadedCount > 0) {
+                        console.debug(
+                            "[internetOutages] loaded:",
+                            loadedCount,
+                            "visible (currentTime in range):",
+                            visibleCount,
+                            "discarded:",
+                            loadedCount - visibleCount
+                        );
+                    }
                 }
             }
 
@@ -143,7 +146,7 @@ export default function GlobeView() {
         }
         
         return result;
-    }, [layers, entitiesByPlugin, filters, selectedEntity, currentTime]);
+    }, [layers, entitiesByPlugin, filters, selectedEntity, currentTime, isPlaybackMode]);
 
     // Imagery & Scene Management Hooks
     useImageryManager(viewerRef.current);

@@ -8,7 +8,7 @@ import { CameraSettings } from "./CameraSettings";
 import { useStore } from "@/core/state/store";
 import { SmartFetcher } from "@/core/data/SmartFetcher";
 import { streamInsecamCameras } from "./insecamStream";
-import { mapRawCamera } from "./cameraMapper";
+import { mapRawCamera, mapGeoJsonFeature } from "./cameraMapper";
 
 export class CameraPlugin implements WorldPlugin {
     id = "camera";
@@ -27,8 +27,8 @@ export class CameraPlugin implements WorldPlugin {
     destroy(): void { this.insecamAbort?.abort(); this.context = null; }
 
     requiresConfiguration(settingsRaw: any): boolean {
-        const s = { sourceType: "url", ...(settingsRaw || {}) };
-        if (s.sourceType === "default") return false;
+        const s = { sourceType: "default", ...(settingsRaw || {}) };
+        if (s.sourceType === "default" || s.sourceType === "traffic") return false;
         if (s.sourceType === "insecam" && !s.insecamCategory) return true;
         if (s.sourceType === "url" && !s.customUrl) return true;
         if (s.sourceType === "file" && !s.customData) return true;
@@ -40,7 +40,7 @@ export class CameraPlugin implements WorldPlugin {
 
     async fetch(_timeRange: TimeRange): Promise<GeoEntity[]> {
         const raw = useStore.getState().dataConfig.pluginSettings[this.id];
-        const settings = { sourceType: "url", ...(raw || {}) };
+        const settings = { sourceType: "default", ...(raw || {}) };
 
         if (settings.action === "reset") {
             this.insecamAbort?.abort();
@@ -49,13 +49,19 @@ export class CameraPlugin implements WorldPlugin {
             return [];
         }
 
-        if (settings.action !== "load" || settings.actionId === this.lastActionId) {
+        const isDefaultOrTraffic = settings.sourceType === "default" || settings.sourceType === "traffic";
+        const isAutoLoad = isDefaultOrTraffic && !this.lastActionId && Object.keys(this.sourceBuckets).length === 0;
+        if (!isAutoLoad && (settings.action !== "load" || settings.actionId === this.lastActionId)) {
             return this.getAllEntities();
         }
-        this.lastActionId = settings.actionId;
+        this.lastActionId = settings.actionId ?? Date.now();
 
         try {
-            if (settings.sourceType === "insecam") {
+            if (settings.sourceType === "default") {
+                await this.loadDefaultSource();
+            } else if (settings.sourceType === "traffic") {
+                await this.loadTrafficCameras();
+            } else if (settings.sourceType === "insecam") {
                 await this.startInsecamStream(settings);
             } else if (settings.sourceType === "url") {
                 await this.loadUrlSource(settings);
@@ -68,6 +74,57 @@ export class CameraPlugin implements WorldPlugin {
             this.context?.onError(error instanceof Error ? error : new Error(String(error)));
             return this.getAllEntities();
         }
+    }
+
+    /** Load local JSON via same-origin fetch (no proxy). Returns parsed JSON or null on 404/error. */
+    private static async fetchLocalJson(path: string): Promise<any | null> {
+        try {
+            const res = await fetch(path);
+            if (!res.ok) return null;
+            const text = await res.text();
+            return text ? JSON.parse(text) : null;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * Default source order: (1) local /public-cameras.json, (2) local /cameras.json.
+     * Local paths use direct fetch only. Supports GeoJSON FeatureCollection.features and raw array.
+     * Missing/404 steps do not break the app.
+     */
+    private static hasUsableCameraData(data: any): boolean {
+        return (data?.features && Array.isArray(data.features) && data.features.length > 0) ||
+            (Array.isArray(data) && data.length > 0);
+    }
+
+    private async loadDefaultSource(): Promise<void> {
+        let data: any = await CameraPlugin.fetchLocalJson("/public-cameras.json");
+        if (data == null || !CameraPlugin.hasUsableCameraData(data)) {
+            data = await CameraPlugin.fetchLocalJson("/cameras.json");
+        }
+        if (data?.features && Array.isArray(data.features)) {
+            this.sourceBuckets["default"] = data.features.map((f: any, i: number) => mapGeoJsonFeature(f, i, "default"));
+        } else if (Array.isArray(data)) {
+            this.sourceBuckets["default"] = data.map((c: any, i: number) => mapRawCamera(c, i, "default"));
+        } else {
+            this.sourceBuckets["default"] = [];
+        }
+        this.pushUpdate();
+    }
+
+    private async loadTrafficCameras(): Promise<void> {
+        try {
+            const res = await fetch("/api/camera/traffic");
+            if (!res.ok) throw new Error(`API returned ${res.status}`);
+            const data = await res.json();
+            if (data.cameras && Array.isArray(data.cameras)) {
+                this.sourceBuckets["traffic"] = data.cameras.map((f: any, i: number) => mapGeoJsonFeature(f, i, "traffic"));
+            }
+        } catch (err) {
+            console.warn("[CameraPlugin] Traffic cameras API failed:", err);
+        }
+        this.pushUpdate();
     }
 
     private async loadUrlSource(settings: any): Promise<void> {

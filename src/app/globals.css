@@ -20,6 +20,7 @@
   --text-accent: #22d3ee;
 
   --accent-cyan: #22d3ee;
+  --accent-cyan-subtle: rgba(34, 211, 238, 0.12);
   --accent-teal: #14b8a6;
   --accent-blue: #3b82f6;
   --accent-purple: #a78bfa;
@@ -236,52 +237,6 @@ html, body {
 
 .btn--glow:hover {
   box-shadow: var(--glow-cyan);
-}
-
-/* ─── Discord Link ────────────────────────────────────────── */
-.discord-link {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xs);
-  text-decoration: none;
-  color: var(--text-secondary);
-  transition: all var(--duration-fast) var(--ease-smooth);
-}
-
-.discord-link:hover {
-  color: #5865F2;
-  border-color: rgba(88, 101, 242, 0.4);
-  box-shadow: 0 0 20px rgba(88, 101, 242, 0.3);
-}
-
-/* ─── Discord Sidebar Link ────────────────────────────────── */
-.discord-sidebar-link {
-  position: sticky;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-md) var(--space-lg);
-  margin-top: auto;
-  background: linear-gradient(135deg, rgba(88, 101, 242, 0.15), rgba(88, 101, 242, 0.05));
-  border: 1px solid rgba(88, 101, 242, 0.25);
-  border-radius: var(--radius-md);
-  color: #b8bfff;
-  text-decoration: none;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-smooth);
-  z-index: 10;
-  flex-shrink: 0;
-}
-
-.discord-sidebar-link:hover {
-  background: linear-gradient(135deg, rgba(88, 101, 242, 0.3), rgba(88, 101, 242, 0.12));
-  border-color: rgba(88, 101, 242, 0.5);
-  color: #dee1ff;
-  box-shadow: 0 0 20px rgba(88, 101, 242, 0.25);
-  transform: translateY(-1px);
 }
 
 /* ─── Sidebar ─────────────────────────────────────────────── */
@@ -532,6 +487,47 @@ html, body {
   flex-direction: column;
   gap: var(--space-sm);
   padding: var(--space-md) var(--space-xl);
+}
+
+.timeline__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-xs) 0;
+  cursor: pointer;
+  user-select: none;
+  color: var(--text-secondary);
+  transition: color var(--duration-fast) var(--ease-smooth);
+}
+
+.timeline__header:hover {
+  color: var(--text-primary);
+}
+
+.timeline__header-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.timeline__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  overflow: hidden;
+  max-height: 200px;
+  opacity: 1;
+  transition: max-height var(--duration-normal) var(--ease-smooth),
+              opacity var(--duration-fast) var(--ease-smooth);
+}
+
+.timeline--collapsed .timeline__body {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  margin-top: calc(-1 * var(--space-sm));
 }
 
 .timeline__row {

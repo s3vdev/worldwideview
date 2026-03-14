@@ -6,6 +6,7 @@ import { set } from "@/lib/serverCache";
 import { CACHE_KEY_AVIATION, LAST_GOOD_KEY_AVIATION, STALE_MAX_AGE_MS, AVIATION_CACHE_TTL_MS } from "./cacheKeys";
 
 export async function pollAviation() {
+    // Prevent overlapping requests and accidental double-entry (e.g. from multiple register() calls)
     if (globalState.isFetching) return;
     globalState.isFetching = true;
 

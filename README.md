@@ -50,8 +50,9 @@ As a real-time situational awareness platform, it turns raw geospatial signalsâ€
 - **Toggle visibility** for decluttered views
 
 ### Public Cameras
-- **Live camera feeds** from around the world
-- **Click to view stream**
+- **Default dataset**: local `/public-cameras.json` (GeoJSON), fallback `/cameras.json`; no proxy for local paths
+- **Optional sources**: traffic cameras (GDOT, Caltrans, TFL via API), custom URL, or file upload
+- **Live streams**: click a camera to view feed
 
 ## Key Philosophies
 

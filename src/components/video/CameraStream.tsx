@@ -3,8 +3,6 @@
 import React, { useState, useEffect } from "react";
 import { Play, Square, Loader2, AlertCircle, ExternalLink, Maximize2 } from "lucide-react";
 import { useStore } from "@/core/state/store";
-import { HlsPlayer } from "./HlsPlayer";
-import { isHlsUrl, isKnownVideoPlatform, getYouTubeEmbedUrl, getStreamErrorMessage } from "./streamUtils";
 
 interface CameraStreamProps {
     streamUrl: string;
@@ -61,26 +59,52 @@ export const CameraStream: React.FC<CameraStreamProps> = ({
     };
 
 
-    const renderStreamContent = () => {
-        // HLS streams need a dedicated video player
-        if (isHlsUrl(streamUrl)) {
-            return (
-                <HlsPlayer
-                    src={streamUrl}
-                    onReady={() => setIsLoading(false)}
-                    onError={(msg) => {
-                        setError(msg);
-                        setIsLoading(false);
-                    }}
-                />
-            );
-        }
+    const getYouTubeUrl = (url: string) => {
+        if (!url) return url;
+        if (url.includes("youtube.com") || url.includes("youtube-nocookie.com") || url.includes("youtu.be")) {
+            try {
+                const u = new URL(url.includes("youtu.be") ? url.replace("youtu.be/", "youtube.com/embed/") : url);
+                // Ensure it's an embed URL
+                if (u.pathname.startsWith("/watch")) {
+                    const videoId = u.searchParams.get("v");
+                    u.pathname = `/embed/${videoId}`;
+                    u.search = "";
+                }
 
-        // Embeddable platforms (YouTube, Twitch, etc.)
-        if (isIframe || isKnownVideoPlatform(streamUrl)) {
+                // Add required parameters, but rely mostly on referrerPolicy
+                if (!u.searchParams.has("autoplay")) u.searchParams.set("autoplay", "1");
+                u.searchParams.set("enablejsapi", "1");
+
+                return u.toString();
+            } catch (e) {
+                return url;
+            }
+        }
+        return url;
+    };
+
+    const isKnownVideoPlatform = (url: string) => {
+        if (!url) return false;
+        const lower = url.toLowerCase();
+        return lower.includes("youtube.com") ||
+            lower.includes("youtu.be") ||
+            lower.includes("youtube-nocookie.com") ||
+            lower.includes("twitch.tv") ||
+            lower.includes("vimeo.com") ||
+            lower.includes("player.") ||
+            lower.includes("/player/") ||
+            lower.includes("webcamera.pl") ||
+            lower.includes(".html");
+    };
+
+    const renderStreamContent = () => {
+        const actualIsIframe = isIframe || isKnownVideoPlatform(streamUrl);
+
+        if (actualIsIframe) {
+            const finalIframeUrl = getYouTubeUrl(streamUrl); // Returns youtube embed or generic url
             return (
                 <iframe
-                    src={getYouTubeEmbedUrl(streamUrl)}
+                    src={finalIframeUrl}
                     style={{
                         position: "absolute",
                         inset: 0,
@@ -100,7 +124,6 @@ export const CameraStream: React.FC<CameraStreamProps> = ({
             );
         }
 
-        // Fallback: static image / MJPEG snapshot
         return (
             <img
                 src={streamUrl}
@@ -112,7 +135,15 @@ export const CameraStream: React.FC<CameraStreamProps> = ({
                 }}
                 onLoad={() => setIsLoading(false)}
                 onError={() => {
-                    setError(getStreamErrorMessage(streamUrl));
+                    let errorMessage = "Stream Failed: The stream might be offline, unreachable due to CORS restrictions, or restricted by the provider.";
+
+                    if (streamUrl.startsWith('http://') && typeof window !== 'undefined' && window.location.protocol === 'https:') {
+                        errorMessage = "Mixed Content Error: Connection blocked because the stream uses insecure HTTP on a secure HTTPS site.";
+                    } else if (streamUrl.endsWith('.m3u8') || streamUrl.includes('.m3u8?')) {
+                        errorMessage = "Unsupported Format: HLS streams (.m3u8) require a dedicated player and cannot be displayed directly as an image.";
+                    }
+
+                    setError(errorMessage);
                     setIsLoading(false);
                 }}
             />

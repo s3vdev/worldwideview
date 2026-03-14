@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { useStore } from "@/core/state/store";
 
 export function Timeline() {
@@ -17,6 +18,7 @@ export function Timeline() {
     const timeRange = useStore((s) => s.timeRange);
 
     const [mounted, setMounted] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(true);
 
     useEffect(() => {
         setMounted(true);
@@ -38,7 +40,26 @@ export function Timeline() {
         mounted ? `${date.toLocaleTimeString()} — ${date.toLocaleDateString()}` : "...";
 
     return (
-        <div className="timeline glass-panel">
+        <div className={`timeline glass-panel ${isExpanded ? "timeline--expanded" : "timeline--collapsed"}`}>
+            {/* Collapsed bar: always visible, toggles expand */}
+            <div
+                className="timeline__header"
+                onClick={() => setIsExpanded((e) => !e)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setIsExpanded((x) => !x)}
+                aria-expanded={isExpanded}
+                aria-label={isExpanded ? "Collapse playback panel" : "Expand playback panel"}
+            >
+                <span className="timeline__header-label">Playback</span>
+                <span className="timeline__time timeline__time--current">
+                    {formatTime(currentTime)}
+                </span>
+                {isExpanded ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+            </div>
+
+            {/* Expandable body: controls, scrubber, time labels */}
+            <div className="timeline__body">
             {/* Row 1: Controls */}
             <div className="timeline__controls-row">
                 <label className={`timeline__mode-toggle ${isPlaybackMode ? "timeline__mode-toggle--active" : ""}`}>
@@ -126,6 +147,7 @@ export function Timeline() {
                 <span className="timeline__time">
                     {mounted ? timeRange.end.toLocaleTimeString() : ""}
                 </span>
+            </div>
             </div>
         </div>
     );

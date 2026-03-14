@@ -16,3 +16,21 @@ export function mapRawCamera(cam: any, index: number, prefix: string): GeoEntity
         properties: { ...cam },
     };
 }
+
+/** Map a GeoJSON Feature (e.g. /public-cameras.json, /cameras.json or traffic API) to a GeoEntity. */
+export function mapGeoJsonFeature(feature: any, index: number, prefix: string): GeoEntity {
+    const coords = feature.geometry?.coordinates;
+    const lon = Array.isArray(coords) ? coords[0] : 0;
+    const lat = Array.isArray(coords) ? coords[1] : 0;
+    const props = feature.properties ?? {};
+    return {
+        id: `camera-${prefix}-${index}`,
+        pluginId: "camera",
+        latitude: lat,
+        longitude: lon,
+        altitude: DEFAULT_CAMERA_ALT,
+        timestamp: new Date(),
+        label: props.name || props.city || props.country || "Unknown Camera",
+        properties: { ...props },
+    };
+}

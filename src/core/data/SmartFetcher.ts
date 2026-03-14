@@ -17,9 +17,17 @@ const failedProxies = new Set<string>();
 
 export class SmartFetcher {
     /**
-     * Attempts to fetch JSON data from a cross-origin URL using the tiered fallback strategy.
+     * Attempts to fetch JSON data from a URL. Local paths (e.g. /cameras.json) are fetched
+     * directly; absolute http(s) URLs use the tiered proxy fallback.
      */
     static async fetchJson(url: string): Promise<any> {
+        const isLocalPath = url.startsWith("/") && !url.startsWith("//");
+        if (isLocalPath) {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`[SmartFetcher] Local path failed: ${url} (${res.status})`);
+            return await this.parseResponse(res);
+        }
+
         // Step 1: Try Direct Fetch (Fastest)
         try {
             const res = await fetch(url);

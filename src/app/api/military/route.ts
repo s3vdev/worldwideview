@@ -1,16 +1,14 @@
 import { NextResponse } from "next/server";
-import { getCachedMilitaryData } from "@/lib/military/cache";
+import { getCachedMilitaryData, fetchMilitaryIfNeeded } from "@/lib/military";
 
 export async function GET() {
+    await fetchMilitaryIfNeeded();
     const cache = getCachedMilitaryData();
 
     if (cache.data) {
         return NextResponse.json(cache.data);
     }
 
-    console.warn(
-        "[API/military] Cache empty. Returning empty state.",
-    );
     return NextResponse.json(
         { ac: [], total: 0, now: Date.now() },
         { status: 200 },

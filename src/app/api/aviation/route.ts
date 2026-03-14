@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCachedAviationData } from "../../../lib/aviation/cache";
+import { fetchAviationIfNeeded } from "../../../lib/aviation/polling";
 import { getLatestFromSupabase } from "../../../lib/aviation/supabase";
 import { CACHE_KEY_AVIATION, LAST_GOOD_KEY_AVIATION, STALE_MAX_AGE_MS } from "../../../lib/aviation/cacheKeys";
 import { globalState } from "../../../lib/aviation/state";
@@ -50,6 +51,8 @@ function buildDebug(
 }
 
 export async function GET(request: Request) {
+    await fetchAviationIfNeeded();
+
     const url = new URL(request.url);
     const cacheMaxAgeParam = url.searchParams.get("cacheMaxAgeMs");
     const cacheTtlMs = clampTtl(cacheMaxAgeParam ? parseInt(cacheMaxAgeParam, 10) : 30 * 60 * 1000);

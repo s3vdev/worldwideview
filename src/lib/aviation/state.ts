@@ -19,7 +19,12 @@ export const globalState = globalThis as unknown as {
     retryAfterMs: number;
     /** Last HTTP status from OpenSky (e.g. 429); used by API for debug */
     openskyLastStatus: number | null;
+    /** Timestamp when we last got 429 or error; used by on-demand fetch to respect backoff. */
+    lastFailureTime: number;
 };
+
+/** Cache considered fresh for on-demand fetch (don't hit OpenSky if we have recent data). */
+export const AVIATION_CACHE_FRESH_MS = 45_000;
 
 if (globalState.aviationPollingStarted === undefined) {
     globalState.aviationData = null;
@@ -33,4 +38,5 @@ if (globalState.aviationPollingStarted === undefined) {
     globalState.currentBackoff = POLL_INTERVAL;
     globalState.retryAfterMs = 0;
     globalState.openskyLastStatus = null;
+    globalState.lastFailureTime = 0;
 }

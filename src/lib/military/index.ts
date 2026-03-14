@@ -1,8 +1,8 @@
 import { globalState, POLL_INTERVAL } from "./state";
 import { getCachedMilitaryData } from "./cache";
-import { pollMilitary } from "./polling";
+import { pollMilitary, fetchMilitaryIfNeeded } from "./polling";
 
-export { getCachedMilitaryData };
+export { getCachedMilitaryData, fetchMilitaryIfNeeded };
 
 export function startMilitaryPolling() {
     if (globalState.militaryPollingStarted) {

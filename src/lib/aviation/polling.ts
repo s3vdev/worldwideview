@@ -1,4 +1,5 @@
-import { globalState, POLL_INTERVAL, MIN_BACKOFF_AFTER_429_MS } from "./state";
+import { globalState, POLL_INTERVAL, MIN_BACKOFF_AFTER_429_MS, AVIATION_CACHE_FRESH_MS } from "./state";
+import { getCachedAviationData } from "./cache";
 import { getOpenSkyAccessToken } from "./auth";
 import { getLatestFromSupabase, recordToSupabase } from "./supabase";
 import { updateFileCache } from "./cache";
@@ -21,6 +22,83 @@ function parseRetryAfterMs(res: Response): number {
         if (Number.isFinite(sec) && sec > 0) return sec * 1000;
     }
     return 0;
+}
+
+/**
+ * One-shot fetch for OpenSky when GET /api/aviation is called (layer enabled). Does not schedule next poll.
+ * Skips if cache is fresh, already fetching, or we're in backoff after 429.
+ */
+export async function fetchAviationIfNeeded(): Promise<void> {
+    const cached = getCachedAviationData();
+    if (cached?.data && cached.timestamp && Date.now() - cached.timestamp < AVIATION_CACHE_FRESH_MS) return;
+    if (globalState.isFetching) return;
+    const now = Date.now();
+    if (globalState.lastFailureTime && now - globalState.lastFailureTime < (globalState.currentBackoff || POLL_INTERVAL)) return;
+
+    globalState.isFetching = true;
+    try {
+        const username = process.env.OPENSKY_CLIENTID;
+        const password = process.env.OPENSKY_CLIENTSECRET;
+        const headers: Record<string, string> = {};
+        const token = await getOpenSkyAccessToken();
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        else if (username && password) headers["Authorization"] = "Basic " + Buffer.from(`${username}:${password}`).toString("base64");
+
+        const res = await fetch("https://opensky-network.org/api/states/all", { headers, cache: "no-store", signal: AbortSignal.timeout(8000) });
+
+        if (!res.ok) {
+            globalState.openskyLastStatus = res.status;
+            globalState.accessToken = null;
+            globalState.tokenExpiry = 0;
+            globalState.lastFailureTime = Date.now();
+            const retryAfterMs = parseRetryAfterMs(res);
+            if (res.status === 429) {
+                globalState.retryAfterMs = retryAfterMs > 0 ? retryAfterMs : MIN_BACKOFF_AFTER_429_MS;
+                globalState.currentBackoff = Math.min(Math.max(globalState.currentBackoff || POLL_INTERVAL, globalState.retryAfterMs), MAX_BACKOFF_MS);
+            } else {
+                globalState.currentBackoff = Math.min((globalState.currentBackoff || POLL_INTERVAL) * 2, MAX_BACKOFF_MS);
+            }
+            if (res.status === 429 && !globalState.aviationData) {
+                const { data: fallbackData } = await getLatestFromSupabase();
+                if (fallbackData?.states?.length) {
+                    globalState.aviationData = fallbackData;
+                    globalState.aviationTimestamp = now;
+                    updateFileCache(fallbackData, now);
+                    set(CACHE_KEY_AVIATION, fallbackData, AVIATION_CACHE_TTL_MS);
+                    set(LAST_GOOD_KEY_AVIATION, fallbackData, STALE_MAX_AGE_MS);
+                }
+            }
+            return;
+        }
+        globalState.currentBackoff = POLL_INTERVAL;
+        globalState.lastFailureTime = 0;
+        const data = await res.json();
+        data._source = "live";
+        globalState.aviationData = data;
+        globalState.aviationTimestamp = now;
+        updateFileCache(data, now);
+        set(CACHE_KEY_AVIATION, data, AVIATION_CACHE_TTL_MS);
+        set(LAST_GOOD_KEY_AVIATION, data, STALE_MAX_AGE_MS);
+        if (data.states?.length && now - (globalState.lastSupabaseInsert || 0) > 5 * 60 * 1000) {
+            globalState.lastSupabaseInsert = now;
+            recordToSupabase(data.states, data.time || Math.floor(now / 1000)).catch(() => {});
+        }
+    } catch (err) {
+        globalState.lastFailureTime = Date.now();
+        globalState.currentBackoff = Math.min((globalState.currentBackoff || POLL_INTERVAL) * 2, MAX_BACKOFF_MS);
+        if (!globalState.aviationData) {
+            const { data: fallbackData } = await getLatestFromSupabase();
+            if (fallbackData?.states?.length) {
+                globalState.aviationData = fallbackData;
+                globalState.aviationTimestamp = Date.now();
+                updateFileCache(fallbackData, globalState.aviationTimestamp);
+                set(CACHE_KEY_AVIATION, fallbackData, AVIATION_CACHE_TTL_MS);
+                set(LAST_GOOD_KEY_AVIATION, fallbackData, STALE_MAX_AGE_MS);
+            }
+        }
+    } finally {
+        globalState.isFetching = false;
+    }
 }
 
 export async function pollAviation() {
@@ -54,6 +132,7 @@ export async function pollAviation() {
             globalState.accessToken = null;
             globalState.tokenExpiry = 0;
 
+            globalState.lastFailureTime = Date.now();
             const retryAfterMs = parseRetryAfterMs(res);
             if (res.status === 429) {
                 globalState.retryAfterMs = retryAfterMs > 0 ? retryAfterMs : MIN_BACKOFF_AFTER_429_MS;
@@ -83,8 +162,8 @@ export async function pollAviation() {
                 }
             }
         } else {
-            // Reset backoff on success
             globalState.currentBackoff = POLL_INTERVAL;
+            globalState.lastFailureTime = 0;
 
             const data = await res.json();
             data._source = "live";

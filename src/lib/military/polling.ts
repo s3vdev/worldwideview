@@ -1,7 +1,41 @@
 import { globalState, POLL_INTERVAL } from "./state";
-import { updateMilitaryCache } from "./cache";
+import { updateMilitaryCache, getCachedMilitaryData } from "./cache";
 
 const ADSB_FI_MIL_URL = "https://opendata.adsb.fi/api/v2/mil";
+
+/** Cache considered fresh for this many ms (slightly less than client poll interval). */
+const CACHE_FRESH_MS = 55_000;
+
+/**
+ * Fetch from adsb.fi if cache is empty or stale. Used by GET /api/military when layer is enabled.
+ * Prevents concurrent fetches via isMilitaryFetching.
+ */
+export async function fetchMilitaryIfNeeded(): Promise<void> {
+    const cached = getCachedMilitaryData();
+    if (cached.data && Date.now() - cached.timestamp < CACHE_FRESH_MS) return;
+    if (globalState.isMilitaryFetching) return;
+
+    globalState.isMilitaryFetching = true;
+    try {
+        const res = await fetch(ADSB_FI_MIL_URL, {
+            cache: "no-store",
+            signal: AbortSignal.timeout(15000),
+        });
+        if (!res.ok) {
+            console.warn(`[Military] adsb.fi returned ${res.status}: ${res.statusText}`);
+            return;
+        }
+        const data = await res.json();
+        const now = Date.now();
+        updateMilitaryCache(data, now);
+        const count = (data as { ac?: unknown[] }).ac?.length ?? 0;
+        console.log(`[Military] Fetched ${count} military aircraft from adsb.fi (on-demand)`);
+    } catch (err) {
+        console.warn("[Military] Fetch error:", err instanceof Error ? err.message : err);
+    } finally {
+        globalState.isMilitaryFetching = false;
+    }
+}
 
 export async function pollMilitary() {
     if (globalState.isMilitaryFetching) return;

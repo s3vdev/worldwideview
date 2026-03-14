@@ -12,10 +12,14 @@ As a real-time situational awareness platform, it turns raw geospatial signalsâ€
 
 ### Aviation
 - **Real-time aircraft tracking** via OpenSky Network
-- **Military aircraft detection** using callsign patterns and ICAO address ranges
-- **Visual distinction**: Military aircraft rendered in orange, civilian in blue/purple gradient by altitude
+- **Military detection** within OpenSky data: callsign patterns and ICAO address ranges mark military aircraft (orange vs. civilian blue/purple by altitude)
 - **10,000+ live aircraft** with smooth interpolation between updates
 - **Filters**: Military status, country, altitude, speed
+
+### Military Aviation
+- **Separate plugin**: real-time military aircraft via **adsb.fi** (dedicated layer, independent of OpenSky)
+- **Own data source** and API route (`/api/military`), server-side polling with backoff
+- **Visual**: military plane icon, altitude-based color coding
 
 ### Satellites
 - **Live orbital tracking** with TLE propagation using satellite.js

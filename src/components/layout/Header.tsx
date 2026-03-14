@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/core/state/store";
 import { dataBus } from "@/core/data/DataBus";
 import { pluginManager } from "@/core/plugins/PluginManager";
-<<<<<<< HEAD
 import { Globe, Search, X } from "lucide-react";
 import { DiscordIcon } from "@/components/common/DiscordIcon";
 import { SearchBar } from "./SearchBar";
@@ -88,7 +87,7 @@ export function Header() {
                     {followEntityId && (
                         <div className="header__following" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                             <span className="status-badge" style={{ color: "var(--accent-cyan)" }}>
-                                Following: {followLabel.slice(0, 12)}{followLabel.length > 12 ? "…" : ""}
+                                Following: {String(followLabel).slice(0, 12)}{String(followLabel).length > 12 ? "…" : ""}
                             </span>
                             <button
                                 type="button"
@@ -171,7 +170,7 @@ export function Header() {
                     {followEntityId && (
                         <div className="header__following" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                             <span className="status-badge" style={{ color: "var(--accent-cyan)" }}>
-                                Following: {followLabel.slice(0, 16)}{followLabel.length > 16 ? "…" : ""}
+                                Following: {String(followLabel).slice(0, 16)}{String(followLabel).length > 16 ? "…" : ""}
                             </span>
                             <button
                                 type="button"

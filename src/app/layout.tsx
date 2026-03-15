@@ -28,6 +28,7 @@ export default function RootLayout({
       <head>
         {/* Load CesiumJS base styles (optional, but helps with UI widgets if used later) */}
         <link rel="stylesheet" href="/cesium/Widgets/widgets.css" />
+        <script defer src="http://192.168.68.64:3002/script.js" data-website-id="2c8f6c09-2651-4a2a-af99-b8cee1612b9a"></script>
       </head>
       <body suppressHydrationWarning>
         {children}

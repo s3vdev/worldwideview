@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import "@/styles/hud-animations.css";
@@ -28,11 +29,15 @@ export default function RootLayout({
       <head>
         {/* Load CesiumJS base styles (optional, but helps with UI widgets if used later) */}
         <link rel="stylesheet" href="/cesium/Widgets/widgets.css" />
-        <script defer src="https://analytics.worldwideview.dev/script.js" data-website-id="2c8f6c09-2651-4a2a-af99-b8cee1612b9a"></script>
       </head>
       <body suppressHydrationWarning>
         {children}
         <Analytics />
+        <Script
+          src="https://analytics.worldwideview.dev/script.js"
+          data-website-id="2c8f6c09-2651-4a2a-af99-b8cee1612b9a"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );

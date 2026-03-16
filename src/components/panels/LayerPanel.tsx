@@ -11,6 +11,7 @@ import { FavoritesTab } from "./FavoritesTab";
 import { ImportPanel } from "@/plugins/geojson/ImportPanel";
 import "@/plugins/geojson/geojson-importer.css";
 import { DiscordIcon } from "@/components/common/DiscordIcon";
+import { trackEvent } from "@/lib/analytics";
 
 
 export function LayerPanel() {
@@ -69,6 +70,7 @@ export function LayerPanel() {
                 useStore.getState().setHighlightLayerId(pluginId);
             }
         }
+        trackEvent("layer-toggle", { layer: pluginId, enabled: !isEnabled });
     };
 
     const [activeTab, setActiveTab] = useState<"layers" | "imagery" | "favorites" | "import">("layers");
@@ -82,25 +84,25 @@ export function LayerPanel() {
             <div className="panel-tabs">
                 <button
                     className={`panel-tab ${activeTab === "layers" ? "panel-tab--active" : ""}`}
-                    onClick={() => setActiveTab("layers")}
+                    onClick={() => { setActiveTab("layers"); trackEvent("panel-tab-switch", { tab: "layers" }); }}
                 >
                     Data Layers
                 </button>
                 <button
                     className={`panel-tab ${activeTab === "imagery" ? "panel-tab--active" : ""}`}
-                    onClick={() => setActiveTab("imagery")}
+                    onClick={() => { setActiveTab("imagery"); trackEvent("panel-tab-switch", { tab: "imagery" }); }}
                 >
                     Imagery
                 </button>
                 <button
                     className={`panel-tab ${activeTab === "favorites" ? "panel-tab--active" : ""}`}
-                    onClick={() => setActiveTab("favorites")}
+                    onClick={() => { setActiveTab("favorites"); trackEvent("panel-tab-switch", { tab: "favorites" }); }}
                 >
                     Favorites
                 </button>
                 <button
                     className={`panel-tab ${activeTab === "import" ? "panel-tab--active" : ""}`}
-                    onClick={() => setActiveTab("import")}
+                    onClick={() => { setActiveTab("import"); trackEvent("panel-tab-switch", { tab: "import" }); }}
                 >
                     Import
                 </button>
@@ -169,6 +171,7 @@ export function LayerPanel() {
                         target="_blank"
                         rel="noopener noreferrer"
                         className="discord-sidebar-link"
+                        onClick={() => trackEvent("discord-link-click")}
                     >
                         <DiscordIcon size={18} />
                         <span>Join our Discord</span>

@@ -3,6 +3,7 @@
 import { useStore } from "@/core/state/store";
 import { ChevronRight, ChevronLeft } from "lucide-react";
 import { useIsMobile } from "@/core/hooks/useIsMobile";
+import { trackEvent } from "@/lib/analytics";
 
 export function PanelToggleArrows() {
     const isMobile = useIsMobile();
@@ -24,6 +25,7 @@ export function PanelToggleArrows() {
         } else {
             toggleLeftSidebar();
         }
+        trackEvent("panel-toggle", { panel: "left", open: !isLeftOpen });
     };
 
     const handleRightToggle = () => {
@@ -32,6 +34,7 @@ export function PanelToggleArrows() {
         } else {
             toggleConfigPanel();
         }
+        trackEvent("panel-toggle", { panel: "right", open: !isRightOpen });
     };
 
     const isLeftOpen = isMobile ? openMobilePanel === "left" : leftSidebarOpen;

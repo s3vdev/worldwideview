@@ -1,5 +1,6 @@
 import { useStore } from "@/core/state/store";
 import { Trash2 } from "lucide-react";
+import { trackEvent } from "@/lib/analytics";
 
 export function FavoritesTab() {
     const favorites = useStore((s) => s.favorites);
@@ -29,6 +30,7 @@ export function FavoritesTab() {
         const entity = entityList.find((e) => e.id === fav.id);
         if (entity) {
             setSelectedEntity(entity);
+            trackEvent("favorite-select", { plugin: fav.pluginId });
         }
     };
 
@@ -60,6 +62,7 @@ export function FavoritesTab() {
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     removeFavorite(fav.id);
+                                    trackEvent("favorite-remove", { plugin: fav.pluginId });
                                 }}
                                 title="Remove from favorites"
                             >

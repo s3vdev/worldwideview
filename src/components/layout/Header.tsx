@@ -5,6 +5,7 @@ import { useStore } from "@/core/state/store";
 import { dataBus } from "@/core/data/DataBus";
 import { pluginManager } from "@/core/plugins/PluginManager";
 import { Globe } from "lucide-react";
+import { trackEvent } from "@/lib/analytics";
 
 import { SearchBar } from "./SearchBar";
 import { useIsMobile } from "@/core/hooks/useIsMobile";
@@ -89,7 +90,10 @@ export function Header() {
                         <button
                             key={r.id}
                             className="btn btn--glow"
-                            onClick={() => dataBus.emit("cameraPreset", { presetId: r.id })}
+                            onClick={() => {
+                                dataBus.emit("cameraPreset", { presetId: r.id });
+                                trackEvent("region-select", { region: r.id });
+                            }}
                             title={r.label}
                             style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}
                         >
@@ -107,6 +111,7 @@ export function Header() {
                                 setTimeWindow(tw);
                                 const range = useStore.getState().timeRange;
                                 pluginManager.updateTimeRange(range);
+                                trackEvent("time-window-change", { window: tw });
                             }}
                         >
                             {tw}

@@ -6,6 +6,7 @@ import { pluginManager } from "@/core/plugins/PluginManager";
 import { TextFilter, SelectFilter, RangeFilter, BooleanFilter } from "./FilterControls";
 import { PluginIcon } from "@/components/common/PluginIcon";
 import type { FilterDefinition, FilterValue } from "@/core/plugins/PluginTypes";
+import { trackEvent } from "@/lib/analytics";
 
 function FilterControl({ def, value, onChange }: {
     def: FilterDefinition;
@@ -72,13 +73,13 @@ export function FilterSection() {
                                         key={def.id}
                                         def={def}
                                         value={filters[pluginId]?.[def.id]}
-                                        onChange={(v) => setFilter(pluginId, def.id, v)}
+                                        onChange={(v) => { setFilter(pluginId, def.id, v); trackEvent("filter-change", { plugin: pluginId, filter: def.id }); }}
                                     />
                                 ))}
                                 {activeCount > 0 && (
                                     <button
                                         className="filter-clear-btn"
-                                        onClick={() => clearFilters(pluginId)}
+                                        onClick={() => { clearFilters(pluginId); trackEvent("filter-clear", { plugin: pluginId }); }}
                                     >
                                         Clear Filters
                                     </button>

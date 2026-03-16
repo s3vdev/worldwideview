@@ -1,6 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { Viewer as CesiumViewer } from "cesium";
 import { Cartographic, Math as CesiumMath } from "cesium";
+import { trackEvent } from "@/lib/analytics";
+
+const CAMERA_DEBOUNCE_MS = 2000;
 
 export function useCameraSync(
     viewer: CesiumViewer | null,
@@ -8,6 +11,8 @@ export function useCameraSync(
     setCameraPosition: (lat: number, lon: number, alt: number, heading: number, pitch: number, roll: number) => void,
     setFps: (fps: number) => void
 ) {
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
     useEffect(() => {
         if (!viewer || viewer.isDestroyed() || !viewer.scene || !viewer.camera || !isReady) return;
 
@@ -25,9 +30,17 @@ export function useCameraSync(
             const pitch = CesiumMath.toDegrees(camera.pitch ?? 0);
             const roll = CesiumMath.toDegrees(camera.roll ?? 0);
 
-            // Use functional update to avoid unnecessary re-renders if values are close enough
-            // But for HUD we want real-time, so we just call it.
             setCameraPosition(lat, lon, alt, heading, pitch, roll);
+
+            // Debounced analytics: fire after camera stops moving
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+            debounceRef.current = setTimeout(() => {
+                trackEvent("camera-move-end", {
+                    lat: Math.round(lat * 100) / 100,
+                    lon: Math.round(lon * 100) / 100,
+                    alt: Math.round(alt),
+                });
+            }, CAMERA_DEBOUNCE_MS);
         };
 
         let frameCount = 0;
@@ -48,6 +61,7 @@ export function useCameraSync(
         viewer.scene.postRender.addEventListener(updateFps);
 
         return () => {
+            if (debounceRef.current) clearTimeout(debounceRef.current);
             if (!viewer.isDestroyed()) {
                 viewer.scene.postRender.removeEventListener(updateStore);
                 viewer.scene.postRender.removeEventListener(updateFps);

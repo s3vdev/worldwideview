@@ -9,6 +9,7 @@ import { useStore } from "@/core/state/store";
 import { pluginManager } from "@/core/plugins/PluginManager";
 import { pluginRegistry } from "@/core/plugins/PluginRegistry";
 import { createGeoJsonPlugin, pickLayerColor } from "./GeoJsonImporterPlugin";
+import { trackEvent } from "@/lib/analytics";
 
 type ImportMethod = "file" | "paste" | "custom";
 
@@ -99,6 +100,7 @@ export function ImportModal({ onClose }: ImportModalProps) {
         pluginManager.enablePlugin(plugin.id);
         useStore.getState().setLayerEnabled(plugin.id, true);
 
+        trackEvent("geojson-import", { featureCount: preview.collection.features.length });
         onClose();
     };
 

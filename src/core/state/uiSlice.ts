@@ -63,13 +63,20 @@ export const createUISlice: StateCreator<AppStore, [], [], UISlice> = (set) => (
         set((state) => ({ configPanelOpen: !state.configPanelOpen })),
     toggleFilterPanel: () =>
         set((state) => ({ filterPanelOpen: !state.filterPanelOpen })),
-    setSelectedEntity: (entity) =>
+    setSelectedEntity: (entity) => {
+        if (entity) {
+            // Dynamic import to avoid circular dep (store → analytics → store)
+            import("@/lib/analytics").then(({ trackEvent }) => {
+                trackEvent("entity-select", { plugin: entity.pluginId, entityId: entity.id });
+            });
+        }
         set({
             selectedEntity: entity,
             rightSidebarOpen: entity !== null,
             configPanelOpen: entity !== null,
             activeConfigTab: entity !== null ? "intel" : "filters"
-        }),
+        });
+    },
     setHoveredEntity: (entity, screenPos) =>
         set({ hoveredEntity: entity, hoveredScreenPosition: screenPos ?? null }),
     setLockedEntityId: (id) =>

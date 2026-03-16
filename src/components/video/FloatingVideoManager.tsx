@@ -1,12 +1,24 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { useStore } from "@/core/state/store";
 import { FloatingWindow } from "@/components/common/FloatingWindow";
 import { CameraStream } from "./CameraStream";
+import { trackEvent } from "@/lib/analytics";
 
 export const FloatingVideoManager: React.FC = () => {
     const { floatingStreams, removeFloatingStream, updateFloatingStream } = useStore();
+    const trackedIds = useRef<Set<string>>(new Set());
+
+    // Track newly opened streams
+    useEffect(() => {
+        for (const stream of floatingStreams) {
+            if (!trackedIds.current.has(stream.id)) {
+                trackedIds.current.add(stream.id);
+                trackEvent("video-feed-open", { label: stream.label });
+            }
+        }
+    }, [floatingStreams]);
 
     if (floatingStreams.length === 0) return null;
 

@@ -10,6 +10,7 @@ import { PluginIcon } from "@/components/common/PluginIcon";
 import { buildUserKeyHeaders } from "@/lib/userApiKeys";
 import { categorizePlace, getZoomForTypes, type PlaceCategory } from "./placeCategories";
 import { useSearchHistory } from "./useSearchHistory";
+import { trackEvent } from "@/lib/analytics";
 
 // ─── Types ───────────────────────────────────────────────────
 export interface SearchResult {
@@ -199,6 +200,8 @@ export function useSearch() {
         addToHistory(result);
         setIsOpen(false);
         setQuery("");
+        trackEvent("search-select", { type: result.type, label: result.label });
+        trackEvent("search-query", { query: result.label });
         if (result.type === "entity" && result.entity) {
             dataBus.emit("cameraGoTo", {
                 lat: result.lat,

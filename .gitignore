@@ -26,6 +26,12 @@
 # scripts
 /scripts/
 
+# local database
+/data/
+
+# generated prisma client
+/src/generated/
+
 # production
 /build
 

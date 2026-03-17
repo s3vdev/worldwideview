@@ -132,7 +132,7 @@ export class CameraPlugin implements WorldPlugin {
 
     private loadFileSource(settings: Record<string, unknown>): void {
         if (!settings.customData || !Array.isArray(settings.customData)) return;
-        this.sourceBuckets["file"] = settings.customData.map((c: unknown, i: number) => mapRawCamera(c, i, "file"));
+        this.sourceBuckets["file"] = settings.customData.map((c: unknown, i: number) => mapRawCamera(c as Record<string, unknown>, i, "file"));
     }
 
     getPollingInterval(): number { return 3600000; }

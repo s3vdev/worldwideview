@@ -111,6 +111,9 @@ describe("DeclarativePlugin", () => {
             timeRange: { start: new Date(), end: new Date() },
             onDataUpdate: () => {},
             onError: () => {},
+            getPluginSettings: () => undefined,
+            isPlaybackMode: () => false,
+            getCurrentTime: () => new Date(),
         });
 
         const entities = await plugin.fetch({ start: new Date(), end: new Date() });

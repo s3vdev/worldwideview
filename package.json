@@ -19,7 +19,7 @@
     "@worldwideview/wwv-plugin-wildfire": "*",
     "@worldwideview/wwv-plugin-borders": "*",
     "@worldwideview/wwv-plugin-camera": "*",
-    "@worldwideview/wwv-plugin-military": "*",
+    "@worldwideview/wwv-plugin-military-aviation": "*",
     "@auth/prisma-adapter": "^2.11.1",
     "@prisma/adapter-better-sqlite3": "^7.5.0",
     "@prisma/client": "^7.5.0",

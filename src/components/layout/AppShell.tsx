@@ -15,7 +15,7 @@ import { MaritimePlugin } from "@worldwideview/wwv-plugin-maritime";
 import { WildfirePlugin } from "@worldwideview/wwv-plugin-wildfire";
 import { BordersPlugin } from "@worldwideview/wwv-plugin-borders";
 import { CameraPlugin } from "@worldwideview/wwv-plugin-camera";
-import { MilitaryPlugin } from "@worldwideview/wwv-plugin-military";
+import { MilitaryPlugin } from "@worldwideview/wwv-plugin-military-aviation";
 import { useStore } from "@/core/state/store";
 import { dataBus } from "@/core/data/DataBus";
 import { PanelToggleArrows } from "@/components/layout/PanelToggleArrows";

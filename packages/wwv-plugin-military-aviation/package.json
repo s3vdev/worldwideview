@@ -1,6 +1,6 @@
 {
-  "name": "@worldwideview/wwv-plugin-military",
-  "version": "1.0.3",
+  "name": "@worldwideview/wwv-plugin-military-aviation",
+  "version": "1.0.0",
   "description": "WorldWideView plugin for real-time military aircraft tracking via adsb.fi. Features altitude-based coloring, flight trail rendering, and aircraft type filters",
   "main": "src/index.ts",
   "types": "src/index.ts",
@@ -10,7 +10,7 @@
   "keywords": [
     "worldwideview",
     "worldwideview-plugin",
-    "wwv-plugin-military",
+    "wwv-plugin-military-aviation",
     "military",
     "military-aviation",
     "adsb",
@@ -21,7 +21,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/silvertakana/worldwideview.git",
-    "directory": "packages/wwv-plugin-military"
+    "directory": "packages/wwv-plugin-military-aviation"
   },
   "homepage": "https://github.com/silvertakana/worldwideview#readme",
   "bugs": {

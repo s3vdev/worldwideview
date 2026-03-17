@@ -1,1 +1,35 @@
-{"name":"@worldwideview/wwv-plugin-camera","version":"1.0.0","description":"Public CCTV camera layer for WorldWideView","main":"src/index.ts","types":"src/index.ts","files":["src"],"keywords":["worldwideview-plugin","wwv-plugin-camera"],"peerDependencies":{"@worldwideview/wwv-plugin-sdk":"*","react":">=18","lucide-react":">=0.576.0"}}
+{
+  "name": "@worldwideview/wwv-plugin-camera",
+  "version": "1.0.1",
+  "description": "WorldWideView plugin for displaying public live cameras and traffic cameras on the globe. Supports custom data sources via URL, file upload, and GeoJSON",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "files": ["src"],
+  "keywords": [
+    "worldwideview",
+    "worldwideview-plugin",
+    "wwv-plugin-camera",
+    "camera",
+    "live-camera",
+    "traffic-camera",
+    "cctv",
+    "cesium",
+    "globe"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/silveittakana/worldwideview.git",
+    "directory": "packages/wwv-plugin-camera"
+  },
+  "homepage": "https://github.com/silveittakana/worldwideview#readme",
+  "bugs": {
+    "url": "https://github.com/silveittakana/worldwideview/issues"
+  },
+  "license": "ISC",
+  "author": "WorldWideView",
+  "peerDependencies": {
+    "@worldwideview/wwv-plugin-sdk": "*",
+    "react": ">=18",
+    "lucide-react": ">=0.576.0"
+  }
+}

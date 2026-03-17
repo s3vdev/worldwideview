@@ -1,1 +1,34 @@
-{"name":"@worldwideview/wwv-plugin-aviation","version":"1.0.0","description":"Real-time aircraft tracking via OpenSky Network for WorldWideView","main":"src/index.ts","types":"src/index.ts","files":["src"],"keywords":["worldwideview-plugin","wwv-plugin-aviation"],"peerDependencies":{"@worldwideview/wwv-plugin-sdk":"*","lucide-react":">=0.576.0"}}
+{
+  "name": "@worldwideview/wwv-plugin-aviation",
+  "version": "1.0.1",
+  "description": "WorldWideView plugin for real-time commercial aircraft tracking via the OpenSky Network API. Renders 3D aircraft models with altitude-based coloring, flight trails, and country/altitude/callsign filters",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "files": ["src"],
+  "keywords": [
+    "worldwideview",
+    "worldwideview-plugin",
+    "wwv-plugin-aviation",
+    "aviation",
+    "aircraft-tracking",
+    "opensky",
+    "flight-tracker",
+    "cesium",
+    "globe"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/silveittakana/worldwideview.git",
+    "directory": "packages/wwv-plugin-aviation"
+  },
+  "homepage": "https://github.com/silveittakana/worldwideview#readme",
+  "bugs": {
+    "url": "https://github.com/silveittakana/worldwideview/issues"
+  },
+  "license": "ISC",
+  "author": "WorldWideView",
+  "peerDependencies": {
+    "@worldwideview/wwv-plugin-sdk": "*",
+    "lucide-react": ">=0.576.0"
+  }
+}

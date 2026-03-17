@@ -1,1 +1,35 @@
-{"name":"@worldwideview/wwv-plugin-wildfire","version":"1.0.0","description":"Real-time wildfire and hotspot data for WorldWideView","main":"src/index.ts","types":"src/index.ts","files":["src"],"keywords":["worldwideview-plugin","wwv-plugin-wildfire"],"peerDependencies":{"@worldwideview/wwv-plugin-sdk":"*","lucide-react":">=0.576.0"}}
+{
+  "name": "@worldwideview/wwv-plugin-wildfire",
+  "version": "1.0.1",
+  "description": "WorldWideView plugin for active wildfire and hotspot detection using NASA FIRMS (VIIRS) satellite data. Supports tiered LOD rendering and FRP-based sizing",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "files": ["src"],
+  "keywords": [
+    "worldwideview",
+    "worldwideview-plugin",
+    "wwv-plugin-wildfire",
+    "wildfire",
+    "fire-detection",
+    "nasa-firms",
+    "viirs",
+    "satellite",
+    "cesium",
+    "globe"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/silveittakana/worldwideview.git",
+    "directory": "packages/wwv-plugin-wildfire"
+  },
+  "homepage": "https://github.com/silveittakana/worldwideview#readme",
+  "bugs": {
+    "url": "https://github.com/silveittakana/worldwideview/issues"
+  },
+  "license": "ISC",
+  "author": "WorldWideView",
+  "peerDependencies": {
+    "@worldwideview/wwv-plugin-sdk": "*",
+    "lucide-react": ">=0.576.0"
+  }
+}

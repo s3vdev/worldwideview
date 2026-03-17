@@ -1,1 +1,32 @@
-{"name":"@worldwideview/wwv-plugin-borders","version":"1.0.0","description":"Country borders and boundaries overlay for WorldWideView","main":"src/index.ts","types":"src/index.ts","files":["src"],"keywords":["worldwideview-plugin","wwv-plugin-borders"],"peerDependencies":{"@worldwideview/wwv-plugin-sdk":"*"}}
+{
+  "name": "@worldwideview/wwv-plugin-borders",
+  "version": "1.0.1",
+  "description": "WorldWideView plugin that displays political borders and country labels as a globe overlay",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "files": ["src"],
+  "keywords": [
+    "worldwideview",
+    "worldwideview-plugin",
+    "wwv-plugin-borders",
+    "borders",
+    "countries",
+    "geopolitical",
+    "cesium",
+    "globe"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/silveittakana/worldwideview.git",
+    "directory": "packages/wwv-plugin-borders"
+  },
+  "homepage": "https://github.com/silveittakana/worldwideview#readme",
+  "bugs": {
+    "url": "https://github.com/silveittakana/worldwideview/issues"
+  },
+  "license": "ISC",
+  "author": "WorldWideView",
+  "peerDependencies": {
+    "@worldwideview/wwv-plugin-sdk": "*"
+  }
+}

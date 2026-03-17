@@ -1,1 +1,34 @@
-{"name":"@worldwideview/wwv-plugin-maritime","version":"1.0.0","description":"Real-time maritime vessel tracking via MarineTraffic for WorldWideView","main":"src/index.ts","types":"src/index.ts","files":["src"],"keywords":["worldwideview-plugin","wwv-plugin-maritime"],"peerDependencies":{"@worldwideview/wwv-plugin-sdk":"*","lucide-react":">=0.576.0"}}
+{
+  "name": "@worldwideview/wwv-plugin-maritime",
+  "version": "1.0.1",
+  "description": "WorldWideView plugin for real-time vessel tracking via AIS feeds. Color-coded by vessel type with speed and heading indicators",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "files": ["src"],
+  "keywords": [
+    "worldwideview",
+    "worldwideview-plugin",
+    "wwv-plugin-maritime",
+    "maritime",
+    "vessel-tracking",
+    "ais",
+    "ships",
+    "cesium",
+    "globe"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/silveittakana/worldwideview.git",
+    "directory": "packages/wwv-plugin-maritime"
+  },
+  "homepage": "https://github.com/silveittakana/worldwideview#readme",
+  "bugs": {
+    "url": "https://github.com/silveittakana/worldwideview/issues"
+  },
+  "license": "ISC",
+  "author": "WorldWideView",
+  "peerDependencies": {
+    "@worldwideview/wwv-plugin-sdk": "*",
+    "lucide-react": ">=0.576.0"
+  }
+}

@@ -1,1 +1,34 @@
-{"name":"@worldwideview/wwv-plugin-military","version":"1.0.0","description":"Military aircraft tracking for WorldWideView","main":"src/index.ts","types":"src/index.ts","files":["src"],"keywords":["worldwideview-plugin","wwv-plugin-military"],"peerDependencies":{"@worldwideview/wwv-plugin-sdk":"*","lucide-react":">=0.576.0"}}
+{
+  "name": "@worldwideview/wwv-plugin-military",
+  "version": "1.0.1",
+  "description": "WorldWideView plugin for real-time military aircraft tracking via adsb.fi. Features altitude-based coloring, flight trail rendering, and aircraft type filters",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "files": ["src"],
+  "keywords": [
+    "worldwideview",
+    "worldwideview-plugin",
+    "wwv-plugin-military",
+    "military",
+    "military-aviation",
+    "adsb",
+    "aircraft-tracking",
+    "cesium",
+    "globe"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/silveittakana/worldwideview.git",
+    "directory": "packages/wwv-plugin-military"
+  },
+  "homepage": "https://github.com/silveittakana/worldwideview#readme",
+  "bugs": {
+    "url": "https://github.com/silveittakana/worldwideview/issues"
+  },
+  "license": "ISC",
+  "author": "WorldWideView",
+  "peerDependencies": {
+    "@worldwideview/wwv-plugin-sdk": "*",
+    "lucide-react": ">=0.576.0"
+  }
+}

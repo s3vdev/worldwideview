@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import type { Viewer as CesiumViewer } from "cesium";
 import type { GeoEntity, CesiumEntityOptions } from "@/core/plugins/PluginTypes";
-import { renderEntitiesChunked, AnimatableItem } from "../EntityRenderer";
+import { renderEntities, AnimatableItem } from "../EntityRenderer";
 import { createUpdateLoop } from "../AnimationLoop";
 
 
@@ -44,8 +44,9 @@ export function useEntityRendering(
         );
         viewer.scene.preUpdate.addEventListener(updatePositions);
 
-        // Chunked rendering fills the map progressively; animation loop picks up new items each frame
-        renderEntitiesChunked(viewer, visibleEntities, animatablesMapRef.current);
+        // Synchronous render — all entities processed atomically in a single frame
+        // to prevent ghost points from the async chunked processor's race condition
+        renderEntities(viewer, visibleEntities, animatablesMapRef.current);
 
         return () => {
             if (!viewer.isDestroyed()) {

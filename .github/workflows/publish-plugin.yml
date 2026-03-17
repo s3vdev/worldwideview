@@ -1,0 +1,37 @@
+name: Publish Plugin to NPM
+
+on:
+  push:
+    tags:
+      - "wwv-plugin-*-v*"  # e.g. wwv-plugin-aviation-v1.0.1
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Detect package name from tag
+        id: pkg
+        run: |
+          TAG="${{ github.ref_name }}"
+          # Strips the -vX.Y.Z suffix: "wwv-plugin-aviation-v1.0.1" → "wwv-plugin-aviation"
+          PKG=$(echo "$TAG" | sed 's/-v[0-9].*//')
+          echo "package=$PKG" >> $GITHUB_OUTPUT
+          echo "Publishing: $PKG"
+
+      - name: Build package
+        run: npm run build -w packages/${{ steps.pkg.outputs.package }}
+
+      - name: Publish to NPM
+        run: npm publish packages/${{ steps.pkg.outputs.package }} --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

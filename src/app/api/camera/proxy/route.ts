@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { cameraProxyLimiter } from "@/lib/rateLimiters";
+import { getClientIp } from "@/lib/rateLimit";
 
 /**
  * Block requests to private/internal networks to prevent SSRF attacks.
@@ -36,6 +38,9 @@ function isPrivateUrl(urlStr: string): boolean {
 }
 
 export async function GET(req: NextRequest) {
+    const rateLimited = cameraProxyLimiter.check(getClientIp(req));
+    if (rateLimited) return rateLimited;
+
     // Require authentication
     const session = await auth();
     if (!session?.user) {

@@ -4,9 +4,18 @@ import type {
     LayerConfig, CesiumEntityOptions, FilterDefinition,
 } from "@worldwideview/wwv-plugin-sdk";
 import { CameraDetail } from "./CameraDetail";
-import { CameraSettings } from "./CameraSettings";
+import { CameraSettings as CameraSettingsComponent } from "./CameraSettings";
 import { mapRawCamera, mapGeoJsonFeature } from "./cameraMapper";
 import { trackEvent } from "@/lib/analytics";
+
+type CameraSettings = {
+    sourceType: "default" | "traffic" | "url" | "file";
+    action?: string;
+    actionId?: number;
+    loaded?: boolean;
+    customUrl?: string;
+    customData?: unknown[] | null;
+};
 
 export class CameraPlugin implements WorldPlugin {
     id = "camera";
@@ -23,10 +32,11 @@ export class CameraPlugin implements WorldPlugin {
     destroy(): void { this.context = null; }
 
     requiresConfiguration(settingsRaw: unknown): boolean {
-        const s = { sourceType: "default", ...((settingsRaw as Record<string, unknown>) || {}) };
-        if (s.sourceType === "default" || s.sourceType === "traffic") return false;
-        if (s.sourceType === "url" && !s.customUrl) return true;
-        if (s.sourceType === "file" && !s.customData) return true;
+        const s = settingsRaw as { sourceType?: string; customUrl?: string; customData?: unknown } | null;
+        const sourceType = s?.sourceType ?? "default";
+        if (sourceType === "default" || sourceType === "traffic") return false;
+        if (sourceType === "url" && !s?.customUrl) return true;
+        if (sourceType === "file" && !s?.customData) return true;
         return false;
     }
 
@@ -35,8 +45,16 @@ export class CameraPlugin implements WorldPlugin {
 
     async fetch(_timeRange: TimeRange): Promise<GeoEntity[]> {
         // Use context instead of direct useStore access
-        const raw = this.context!.getPluginSettings<Record<string, unknown>>(this.id);
-        const settings = { sourceType: "default", ...(raw || {}) };
+        const rawSettings = this.context!.getPluginSettings<Record<string, unknown>>(this.id);
+        const settings = {
+            sourceType: "default" as "default" | "traffic" | "url" | "file",
+            action: undefined as string | undefined,
+            actionId: undefined as number | undefined,
+            loaded: undefined as boolean | undefined,
+            customUrl: undefined as string | undefined,
+            customData: undefined as unknown[] | null | undefined,
+            ...((rawSettings as Record<string, unknown>) || {}),
+        };
 
         if (settings.action === "reset") {
             this.sourceBuckets = {};
@@ -131,7 +149,7 @@ export class CameraPlugin implements WorldPlugin {
     }
 
     getDetailComponent() { return CameraDetail; }
-    getSettingsComponent() { return CameraSettings; }
+    getSettingsComponent() { return CameraSettingsComponent; }
 
     getFilterDefinitions(): FilterDefinition[] {
         return [

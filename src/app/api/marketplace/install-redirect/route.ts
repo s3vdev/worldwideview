@@ -5,6 +5,8 @@ import { upsertPlugin } from "@/lib/marketplace/repository";
 import { issueMarketplaceToken } from "@/lib/marketplace/marketplaceToken";
 import type { PluginManifest } from "@/core/plugins/PluginManifest";
 import { validateManifest } from "@/core/plugins/validateManifest";
+import { installLimiter } from "@/lib/rateLimiters";
+import { getClientIp } from "@/lib/rateLimit";
 
 const ALLOWED_REDIRECT_HOSTS = new Set([
     "localhost",
@@ -31,6 +33,9 @@ export async function GET(request: NextRequest) {
     const redirectTo = searchParams.get("redirectTo") ?? "";
 
     try {
+        const rateLimited = installLimiter.check(getClientIp(request));
+        if (rateLimited) return rateLimited;
+
         const session = await auth();
 
         // Not logged in — send to login with this URL as callbackUrl

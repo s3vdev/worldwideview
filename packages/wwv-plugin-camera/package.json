@@ -1,13 +1,1 @@
-{
-  "name": "@worldwideview/wwv-plugin-camera",
-  "version": "1.0.0",
-  "description": "Public live cameras plugin for WorldWideView",
-  "main": "src/index.ts",
-  "types": "src/index.ts",
-  "keywords": ["worldwideview-plugin", "wwv-plugin-camera"],
-  "peerDependencies": {
-    "@worldwideview/wwv-plugin-sdk": "*",
-    "lucide-react": ">=0.576.0",
-    "react": ">=18"
-  }
-}
+{"name":"@worldwideview/wwv-plugin-camera","version":"1.0.0","description":"Public CCTV camera layer for WorldWideView","main":"src/index.ts","types":"src/index.ts","files":["src"],"keywords":["worldwideview-plugin","wwv-plugin-camera"],"peerDependencies":{"@worldwideview/wwv-plugin-sdk":"*","react":">=18","lucide-react":">=0.576.0"}}

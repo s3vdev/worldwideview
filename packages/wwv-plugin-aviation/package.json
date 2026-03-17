@@ -1,12 +1,1 @@
-{
-  "name": "@worldwideview/wwv-plugin-aviation",
-  "version": "1.0.0",
-  "description": "Real-time aircraft tracking via OpenSky Network for WorldWideView",
-  "main": "src/index.ts",
-  "types": "src/index.ts",
-  "keywords": ["worldwideview-plugin", "wwv-plugin-aviation"],
-  "peerDependencies": {
-    "@worldwideview/wwv-plugin-sdk": "*",
-    "lucide-react": ">=0.576.0"
-  }
-}
+{"name":"@worldwideview/wwv-plugin-aviation","version":"1.0.0","description":"Real-time aircraft tracking via OpenSky Network for WorldWideView","main":"src/index.ts","types":"src/index.ts","files":["src"],"keywords":["worldwideview-plugin","wwv-plugin-aviation"],"peerDependencies":{"@worldwideview/wwv-plugin-sdk":"*","lucide-react":">=0.576.0"}}

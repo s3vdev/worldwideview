@@ -7,7 +7,7 @@ import type { PluginManifest } from "@/core/plugins/PluginManifest";
 import { validateManifest } from "@/core/plugins/validateManifest";
 import { installLimiter } from "@/lib/rateLimiters";
 import { getClientIp } from "@/lib/rateLimit";
-import { isPluginInstallEnabled, isDemoAdmin } from "@/core/edition";
+import { isPluginInstallEnabled } from "@/core/edition";
 import { getVerifiedPluginIds } from "@/lib/marketplace/registryClient";
 
 const ALLOWED_REDIRECT_HOSTS = new Set([
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     const redirectTo = searchParams.get("redirectTo") ?? "";
 
     try {
-        if (!isPluginInstallEnabled && !isDemoAdmin(await auth())) {
+        if (!isPluginInstallEnabled) {
             return NextResponse.json(
                 { error: "Plugin installation is disabled on this instance" },
                 { status: 403 },

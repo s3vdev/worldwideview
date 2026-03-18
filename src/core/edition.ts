@@ -49,14 +49,32 @@ export const isCloud: boolean = edition === "cloud";
 export const isDemo: boolean = edition === "demo";
 
 // ---------------------------------------------------------------------------
+// Demo admin secret (must be before feature flags so they can reference it)
+// ---------------------------------------------------------------------------
+
+/**
+ * Server-side secret used as the admin password on the demo edition.
+ * Set `WWV_DEMO_ADMIN_SECRET` in `.env` — never use `NEXT_PUBLIC_`.
+ * When configured on demo, enables plugin management for the instance.
+ */
+const DEMO_ADMIN_SECRET: string | undefined =
+    process.env.WWV_DEMO_ADMIN_SECRET?.trim() || undefined;
+
+/** True when demo edition has an admin secret configured. */
+export const isDemoAdminConfigured: boolean = isDemo && !!DEMO_ADMIN_SECRET;
+
+// ---------------------------------------------------------------------------
 // Feature flags (derived from edition)
 // ---------------------------------------------------------------------------
 
 /** Auth (login / registration) is available on local & cloud, not demo. */
 export const isAuthEnabled: boolean = !isDemo;
 
-/** Plugin install/uninstall is available on local & cloud, not demo. */
-export const isPluginInstallEnabled: boolean = !isDemo;
+/**
+ * Plugin install/uninstall is enabled on local & cloud.
+ * On demo, only enabled when the operator has configured an admin secret.
+ */
+export const isPluginInstallEnabled: boolean = !isDemo || isDemoAdminConfigured;
 
 /** Settings are editable on local & cloud, read-only on demo. */
 export const isSettingsEditable: boolean = !isDemo;
@@ -69,17 +87,6 @@ export const isSettingsEditable: boolean = !isDemo;
  * own licence relationship with OpenSky.
  */
 export const isHistoryEnabled: boolean = !isDemo;
-
-// ---------------------------------------------------------------------------
-// Demo admin override
-// ---------------------------------------------------------------------------
-
-/**
- * Server-side secret used as the admin password on the demo edition.
- * Set `WWV_DEMO_ADMIN_SECRET` in `.env` — never use `NEXT_PUBLIC_`.
- */
-const DEMO_ADMIN_SECRET: string | undefined =
-    process.env.WWV_DEMO_ADMIN_SECRET?.trim() || undefined;
 
 /**
  * Returns the demo admin secret for use by the auth provider.

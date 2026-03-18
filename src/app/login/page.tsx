@@ -5,6 +5,17 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { loginAction } from "./actions";
 import styles from "../setup/setup.module.css";
 
+/** Allow relative paths or absolute URLs on the same origin. */
+function getSafeRedirect(url: string | null): string {
+    if (!url) return "/";
+    if (url.startsWith("/")) return url;
+    try {
+        const parsed = new URL(url);
+        if (parsed.origin === window.location.origin) return url;
+    } catch { /* invalid URL — fall through */ }
+    return "/";
+}
+
 export default function LoginPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -21,10 +32,14 @@ export default function LoginPage() {
         const result = await loginAction(formData);
 
         if (result.success) {
-            // Follow callbackUrl if it's a safe same-origin path
-            const target = callbackUrl?.startsWith("/") ? callbackUrl : "/";
-            router.push(target);
-            router.refresh();
+            const target = getSafeRedirect(callbackUrl);
+            if (target === "/") {
+                router.push("/");
+                router.refresh();
+            } else {
+                // Full navigation for API routes / external same-origin paths
+                window.location.href = target;
+            }
         } else {
             setError(result.error ?? "Login failed.");
             setLoading(false);

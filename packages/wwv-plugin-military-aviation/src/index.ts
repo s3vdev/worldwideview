@@ -24,7 +24,7 @@ function militaryAltitudeToColor(altFeet: number | null): string {
 function feetToMeters(feet: number): number { return feet * 0.3048; }
 
 export class MilitaryPlugin implements WorldPlugin {
-    id = "military";
+    id = "military-aviation";
     name = "Military Aviation";
     description = "Real-time military aircraft tracking via adsb.fi";
     icon = Shield;
@@ -49,7 +49,7 @@ export class MilitaryPlugin implements WorldPlugin {
                     const altMeters = altFeet !== null ? feetToMeters(altFeet) : null;
                     const isOnGround = ac.alt_baro === "ground";
                     return {
-                        id: `military-${ac.hex}`, pluginId: "military",
+                        id: `military-aviation-${ac.hex}`, pluginId: "military-aviation",
                         latitude: ac.lat!, longitude: ac.lon!,
                         altitude: altMeters !== null ? altMeters * 10 : 0,
                         heading: ac.track ?? undefined, speed: ac.gs ?? undefined,

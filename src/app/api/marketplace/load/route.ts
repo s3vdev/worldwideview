@@ -4,6 +4,7 @@ import { handlePreflight, withCors } from "@/lib/marketplace/cors";
 import { validateManifest } from "@/core/plugins/validateManifest";
 import { validateMarketplaceAuth } from "@/lib/marketplace/auth";
 import type { PluginManifest } from "@/core/plugins/PluginManifest";
+import { getVerifiedPluginIds } from "@/lib/marketplace/registryClient";
 
 export async function OPTIONS(request: Request) {
     return handlePreflight(request);
@@ -13,13 +14,19 @@ export async function OPTIONS(request: Request) {
  * Returns manifests of all installed marketplace plugins that are valid
  * and need dynamic loading (i.e. not built-in plugins already in AppShell).
  * Called by the client at startup to load installed plugins.
+ *
+ * Trust is re-stamped against the live registry so that plugins removed
+ * from the verified list are correctly flagged as unverified.
  */
 export async function GET(request: Request) {
     const authError = await validateMarketplaceAuth(request);
     if (authError) return withCors(authError, request);
 
     try {
-        const records = await prisma.installedPlugin.findMany();
+        const [records, verifiedIds] = await Promise.all([
+            prisma.installedPlugin.findMany(),
+            getVerifiedPluginIds(),
+        ]);
 
         const manifests = records
             .map((r): PluginManifest | null => {
@@ -48,6 +55,14 @@ export async function GET(request: Request) {
                 // Skip records with no usable manifest (e.g. old empty-config installs)
                 const { valid } = validateManifest(m);
                 return valid;
+            })
+            .map((m) => {
+                // Re-stamp trust against the live registry so revoked plugins
+                // are correctly gated by the unverified dialog on the client.
+                if (m.trust !== "built-in") {
+                    m.trust = verifiedIds.has(m.id) ? "verified" : "unverified";
+                }
+                return m;
             });
 
         return withCors(NextResponse.json({ manifests }), request);
@@ -56,3 +71,4 @@ export async function GET(request: Request) {
         return withCors(NextResponse.json({ manifests: [] }), request);
     }
 }
+

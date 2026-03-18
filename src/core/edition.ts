@@ -69,3 +69,26 @@ export const isSettingsEditable: boolean = !isDemo;
  * own licence relationship with OpenSky.
  */
 export const isHistoryEnabled: boolean = !isDemo;
+
+// ---------------------------------------------------------------------------
+// Demo admin override
+// ---------------------------------------------------------------------------
+
+/**
+ * Server-side secret that lets the demo operator bypass read-only
+ * restrictions (e.g. plugin install/uninstall).
+ *
+ * Set `WWV_DEMO_ADMIN_SECRET` in `.env` — never use `NEXT_PUBLIC_`.
+ * The operator sends `x-wwv-admin-secret: <secret>` with requests.
+ */
+const DEMO_ADMIN_SECRET: string | undefined =
+    process.env.WWV_DEMO_ADMIN_SECRET?.trim() || undefined;
+
+/**
+ * Returns `true` when the request carries a valid demo admin secret.
+ * Only meaningful on the demo edition — always returns `false` otherwise.
+ */
+export function isDemoAdminRequest(request: Request): boolean {
+    if (!isDemo || !DEMO_ADMIN_SECRET) return false;
+    return request.headers.get("x-wwv-admin-secret") === DEMO_ADMIN_SECRET;
+}

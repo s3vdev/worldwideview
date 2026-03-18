@@ -5,7 +5,7 @@ import { handlePreflight, withCors } from "@/lib/marketplace/cors";
 import { validateManifest } from "@/core/plugins/validateManifest";
 import { marketplaceApiLimiter } from "@/lib/rateLimiters";
 import { getClientIp } from "@/lib/rateLimit";
-import { isPluginInstallEnabled } from "@/core/edition";
+import { isPluginInstallEnabled, isDemoAdminRequest } from "@/core/edition";
 import { getVerifiedPluginIds } from "@/lib/marketplace/registryClient";
 
 export async function OPTIONS(request: Request) {
@@ -13,7 +13,7 @@ export async function OPTIONS(request: Request) {
 }
 
 export async function POST(request: Request) {
-    if (!isPluginInstallEnabled) {
+    if (!isPluginInstallEnabled && !isDemoAdminRequest(request)) {
         return withCors(
             NextResponse.json({ error: "Plugin installation is disabled on this instance" }, { status: 403 }),
             request,

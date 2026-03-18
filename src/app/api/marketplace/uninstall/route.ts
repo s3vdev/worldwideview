@@ -5,7 +5,8 @@ import { handlePreflight, withCors } from "@/lib/marketplace/cors";
 import { BUILT_IN_PLUGIN_IDS } from "@/lib/marketplace/builtinPlugins";
 import { marketplaceApiLimiter } from "@/lib/rateLimiters";
 import { getClientIp } from "@/lib/rateLimit";
-import { isPluginInstallEnabled, isDemoAdminRequest } from "@/core/edition";
+import { isPluginInstallEnabled, isDemoAdmin } from "@/core/edition";
+import { auth } from "@/lib/auth";
 
 export async function OPTIONS(request: Request) {
     return handlePreflight(request);
@@ -14,7 +15,7 @@ export async function OPTIONS(request: Request) {
 const builtInSet = new Set<string>(BUILT_IN_PLUGIN_IDS);
 
 export async function POST(request: Request) {
-    if (!isPluginInstallEnabled && !isDemoAdminRequest(request)) {
+    if (!isPluginInstallEnabled && !isDemoAdmin(await auth())) {
         return withCors(
             NextResponse.json({ error: "Plugin management is disabled on this instance" }, { status: 403 }),
             request,

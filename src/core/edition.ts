@@ -75,20 +75,31 @@ export const isHistoryEnabled: boolean = !isDemo;
 // ---------------------------------------------------------------------------
 
 /**
- * Server-side secret that lets the demo operator bypass read-only
- * restrictions (e.g. plugin install/uninstall).
- *
+ * Server-side secret used as the admin password on the demo edition.
  * Set `WWV_DEMO_ADMIN_SECRET` in `.env` — never use `NEXT_PUBLIC_`.
- * The operator sends `x-wwv-admin-secret: <secret>` with requests.
  */
 const DEMO_ADMIN_SECRET: string | undefined =
     process.env.WWV_DEMO_ADMIN_SECRET?.trim() || undefined;
 
 /**
- * Returns `true` when the request carries a valid demo admin secret.
- * Only meaningful on the demo edition — always returns `false` otherwise.
+ * Returns the demo admin secret for use by the auth provider.
+ * Only returns a value on demo edition when the secret is configured.
  */
-export function isDemoAdminRequest(request: Request): boolean {
-    if (!isDemo || !DEMO_ADMIN_SECRET) return false;
-    return request.headers.get("x-wwv-admin-secret") === DEMO_ADMIN_SECRET;
+export function getDemoAdminSecret(): string | undefined {
+    if (!isDemo) return undefined;
+    return DEMO_ADMIN_SECRET;
 }
+
+/** Demo admin session role constant. */
+export const DEMO_ADMIN_ROLE = "demo-admin";
+
+/**
+ * Returns `true` when the session belongs to the demo admin user.
+ * Accepts any session-like object (uses runtime narrowing to avoid
+ * type conflicts with Auth.js `Session` which doesn't declare `role`).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function isDemoAdmin(session: any): boolean {
+    return isDemo && session?.user?.role === DEMO_ADMIN_ROLE;
+}
+

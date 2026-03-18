@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth";
 import { issueMarketplaceToken } from "@/lib/marketplace/marketplaceToken";
 import { grantTokenLimiter } from "@/lib/rateLimiters";
 import { getClientIp } from "@/lib/rateLimit";
-import { isPluginInstallEnabled, isDemoAdminRequest } from "@/core/edition";
+import { isPluginInstallEnabled, isDemoAdmin } from "@/core/edition";
 
 const ALLOWED_REDIRECT_HOSTS = new Set([
     "localhost",
@@ -33,7 +33,7 @@ function isSafeRedirect(url: string): boolean {
  *   redirectTo - URL to redirect to with ?token=<jwt> appended (must be allowlisted)
  */
 export async function GET(request: NextRequest) {
-    if (!isPluginInstallEnabled && !isDemoAdminRequest(request)) {
+    if (!isPluginInstallEnabled && !isDemoAdmin(await auth())) {
         return NextResponse.json(
             { error: "Marketplace tokens are not available on this instance" },
             { status: 403 },

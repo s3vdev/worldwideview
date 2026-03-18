@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { compareSync } from "bcryptjs";
 import { prisma } from "@/lib/db";
+import { isDemo, getDemoAdminSecret, DEMO_ADMIN_ROLE } from "@/core/edition";
 import { authConfig } from "@/lib/auth.config";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -18,6 +19,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 const password = credentials?.password as string | undefined;
 
                 if (!email || !password) return null;
+
+                // Demo edition: virtual admin login (no DB user required)
+                const adminSecret = getDemoAdminSecret();
+                if (isDemo && adminSecret && email === "admin" && password === adminSecret) {
+                    return {
+                        id: "demo-admin",
+                        name: "Demo Admin",
+                        email: "admin",
+                        role: DEMO_ADMIN_ROLE,
+                    };
+                }
 
                 const user = await prisma.user.findUnique({
                     where: { email },

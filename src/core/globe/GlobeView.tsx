@@ -22,6 +22,7 @@ import { initPrimitiveCollections, AnimatableItem } from "./EntityRenderer";
 import { handleEntitySelection, cleanupTrail } from "./SelectionHandler";
 import { useImageryManager } from "./useImageryManager";
 import { dataBus } from "@/core/data/DataBus";
+import { getCachedRenderOptions } from "./renderOptionsCache";
 
 // New Hooks
 import { useCameraActions } from "./hooks/useCameraActions";
@@ -60,7 +61,7 @@ export default function GlobeView() {
     const setCameraPosition = useStore((s) => s.setCameraPosition);
     const setFps = useStore((s) => s.setFps);
 
-    // Compute visible & filtered entities
+    // Compute visible & filtered entities (DOD: renderEntity results are memoized)
     const visibleEntities = useMemo(() => {
         const result: Array<{ entity: GeoEntity; options: CesiumEntityOptions }> = [];
         pluginManager.getAllPlugins().forEach((managed) => {
@@ -69,7 +70,7 @@ export default function GlobeView() {
             const defs = managed.plugin.getFilterDefinitions?.() || [];
             const active = filters[managed.plugin.id] || {};
             applyFilters(entities, defs, active).forEach((entity) => {
-                result.push({ entity, options: managed.plugin.renderEntity(entity) });
+                result.push({ entity, options: getCachedRenderOptions(managed.plugin, entity) });
             });
         });
         return result;

@@ -9,7 +9,7 @@ export class VolcanoesPlugin implements WorldPlugin {
     name = "Volcanoes";
     description = "Active and dormant volcanoes worldwide from OSM";
     icon = Mountain;
-    category = "natural disaster" as const;
+    category = "natural-disaster" as const;
     version = "1.0.0";
 
     async initialize(_ctx: PluginContext): Promise<void> { }

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Play, Square, Loader2, AlertCircle, ExternalLink, Maximize2 } from "lucide-react";
 import { useStore } from "@/core/state/store";
 import { HlsPlayer } from "./HlsPlayer";
-import { isHlsUrl, isKnownVideoPlatform, getYouTubeEmbedUrl, getStreamErrorMessage } from "./streamUtils";
+import { isHlsUrl, isKnownVideoPlatform, getYouTubeEmbedUrl, getStreamErrorMessage, getProxiedStreamUrl } from "./streamUtils";
 
 interface CameraStreamProps {
     streamUrl: string;
@@ -22,8 +22,9 @@ export const CameraStream: React.FC<CameraStreamProps> = ({
     const [isPlaying, setIsPlaying] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [hlsFailed, setHlsFailed] = useState(false);
 
-    useEffect(() => { setIsPlaying(false); setError(null); setIsLoading(false); }, [streamUrl]);
+    useEffect(() => { setIsPlaying(false); setError(null); setIsLoading(false); setHlsFailed(false); }, [streamUrl]);
 
     const handlePopOut = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -39,17 +40,24 @@ export const CameraStream: React.FC<CameraStreamProps> = ({
     };
 
     const handleStop = (e?: React.MouseEvent) => {
-        e?.stopPropagation(); setIsPlaying(false); setIsLoading(false); setError(null);
+        e?.stopPropagation(); setIsPlaying(false); setIsLoading(false); setError(null); setHlsFailed(false);
     };
 
     const renderStreamContent = () => {
-        // HLS streams need a dedicated video player
-        if (isHlsUrl(streamUrl)) {
+        // HLS streams need a dedicated video player — fall back to JPEG preview if HLS fails
+        if (isHlsUrl(streamUrl) && !hlsFailed) {
             return (
                 <HlsPlayer
                     src={streamUrl}
                     onReady={() => setIsLoading(false)}
-                    onError={(msg) => { setError(msg); setIsLoading(false); }}
+                    onError={(msg) => {
+                        if (previewUrl) {
+                            setHlsFailed(true);
+                        } else {
+                            setError(msg);
+                        }
+                        setIsLoading(false);
+                    }}
                 />
             );
         }
@@ -72,14 +80,17 @@ export const CameraStream: React.FC<CameraStreamProps> = ({
             );
         }
 
-        // Fallback: static image / MJPEG snapshot
+        // Fallback: static image / MJPEG snapshot (proxy HTTP→HTTPS if needed)
+        // When HLS failed and a preview JPEG exists, show that instead
+        const fallbackUrl = hlsFailed && previewUrl ? previewUrl : streamUrl;
+        const resolvedUrl = getProxiedStreamUrl(fallbackUrl);
         return (
             <img
-                src={streamUrl}
+                src={resolvedUrl}
                 alt={label || "Live camera stream"}
                 style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
                 onLoad={() => setIsLoading(false)}
-                onError={() => { setError(getStreamErrorMessage(streamUrl)); setIsLoading(false); }}
+                onError={() => { setError(getStreamErrorMessage(fallbackUrl)); setIsLoading(false); }}
             />
         );
     };

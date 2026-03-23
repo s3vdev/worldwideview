@@ -62,6 +62,23 @@ export function getYouTubeEmbedUrl(url: string): string {
     }
 }
 
+/**
+ * If the page is served over HTTPS and the stream is plain HTTP, rewrite
+ * the URL to go through our server-side stream proxy to avoid mixed-content
+ * blocks.  Returns the original URL if no proxying is needed.
+ */
+export function getProxiedStreamUrl(url: string): string {
+    if (!url) return url;
+    const isHttpStream = url.startsWith("http://");
+    const pageIsHttps =
+        typeof window !== "undefined" && window.location.protocol === "https:";
+
+    if (isHttpStream && pageIsHttps) {
+        return `/api/camera/proxy/stream?url=${encodeURIComponent(url)}`;
+    }
+    return url;
+}
+
 /** Return a user-friendly error message for a failed stream URL. */
 export function getStreamErrorMessage(streamUrl: string): string {
     if (

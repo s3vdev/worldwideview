@@ -6,12 +6,24 @@ import { createPortal } from "react-dom";
 interface TooltipProps {
     children: React.ReactNode;
     content: React.ReactNode;
+    delay?: number;
 }
 
-export function Tooltip({ children, content }: TooltipProps) {
+export function Tooltip({ children, content, delay = 300 }: TooltipProps) {
     const [visible, setVisible] = useState(false);
     const [coords, setCoords] = useState({ top: 0, left: 0 });
     const targetRef = useRef<HTMLSpanElement>(null);
+    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    const showTooltip = () => {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        timeoutRef.current = setTimeout(() => setVisible(true), delay);
+    };
+
+    const hideTooltip = () => {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        setVisible(false);
+    };
 
     useEffect(() => {
         if (visible && targetRef.current) {
@@ -26,10 +38,10 @@ export function Tooltip({ children, content }: TooltipProps) {
     return (
         <span
             ref={targetRef}
-            onMouseEnter={() => setVisible(true)}
-            onMouseLeave={() => setVisible(false)}
-            onFocus={() => setVisible(true)}
-            onBlur={() => setVisible(false)}
+            onMouseEnter={showTooltip}
+            onMouseLeave={hideTooltip}
+            onFocus={showTooltip}
+            onBlur={hideTooltip}
             style={{ display: "inline-flex" }}
         >
             {children}

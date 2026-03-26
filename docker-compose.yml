@@ -1,0 +1,11 @@
+services:
+  wwv:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - wwv-data:/app/data
+    env_file: .env
+
+volumes:
+  wwv-data:

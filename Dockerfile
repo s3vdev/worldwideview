@@ -28,13 +28,15 @@ ENV PORT=3000
 ENV DATABASE_URL=file:./data/wwv.db
 ENV AUTH_TRUST_HOST=true
 
-# Copy pre-initialized SQLite database (tables already created)
-COPY --from=builder /app/data ./data
+# Copy Prisma schema + migrations for runtime DB init
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 
 # Copy Prisma generated client for runtime
 COPY --from=builder /app/src/generated ./src/generated
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/node_modules/better-sqlite3 ./node_modules/better-sqlite3
+COPY --from=builder /app/node_modules/dotenv ./node_modules/dotenv
 
 # Copy standalone server output
 COPY --from=builder /app/.next/standalone ./
@@ -43,6 +45,10 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
+# Entrypoint: migrate DB on first run, then start server
+COPY docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x ./docker-entrypoint.sh
+
 EXPOSE 3000
 
-CMD ["node", "server.js"]
+ENTRYPOINT ["./docker-entrypoint.sh"]

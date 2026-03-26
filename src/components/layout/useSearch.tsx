@@ -175,8 +175,8 @@ export function useSearch() {
     // Debounced search
     useEffect(() => {
         if (!query.trim()) {
-            setLiveSections([]);
-            setSelectedIndex(0);
+            setLiveSections((prev) => (prev.length === 0 ? prev : []));
+            setSelectedIndex((prev) => (prev === 0 ? prev : 0));
             return;
         }
         let isStale = false;

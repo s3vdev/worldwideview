@@ -21,15 +21,21 @@ export function DataBusSubscriber() {
 
     useEffect(() => {
         const unsubReg = dataBus.on("pluginRegistered", ({ pluginId, defaultInterval }) => {
-            const currentIntervals = useStore.getState().dataConfig.pollingIntervals;
-            if (!currentIntervals[pluginId]) {
-                setPollingInterval(pluginId, defaultInterval);
-            }
+            setTimeout(() => {
+                const currentIntervals = useStore.getState().dataConfig.pollingIntervals;
+                if (!currentIntervals[pluginId]) {
+                    setPollingInterval(pluginId, defaultInterval);
+                }
+            }, 0);
         });
 
         const unsubData = dataBus.on("dataUpdated", ({ pluginId, entities }) => {
-            setEntities(pluginId, entities);
-            setEntityCount(pluginId, entities.length);
+            // Defer the state updates by one tick to prevent React "Maximum update depth exceeded"
+            // errors during massive synchronous plugin loads (e.g. at boot).
+            setTimeout(() => {
+                setEntities(pluginId, entities);
+                setEntityCount(pluginId, entities.length);
+            }, 0);
         });
 
         return () => {

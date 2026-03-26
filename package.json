@@ -2,7 +2,9 @@
   "name": "worldwideview",
   "version": "0.1.0",
   "private": true,
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "setup": "node scripts/setup.mjs",
     "clean": "node -e \"const fs=require('fs');fs.rmSync('.next',{recursive:true,force:true})\"",
@@ -14,18 +16,18 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@worldwideview/wwv-plugin-sdk": "*",
-    "@worldwideview/wwv-plugin-aviation": "*",
-    "@worldwideview/wwv-plugin-maritime": "*",
-    "@worldwideview/wwv-plugin-wildfire": "*",
-    "@worldwideview/wwv-plugin-borders": "*",
-    "@worldwideview/wwv-plugin-camera": "*",
-    "@worldwideview/wwv-plugin-military-aviation": "*",
     "@auth/prisma-adapter": "^2.11.1",
     "@prisma/adapter-better-sqlite3": "^7.5.0",
     "@prisma/client": "^7.5.0",
     "@supabase/supabase-js": "^2.98.0",
     "@vercel/analytics": "^1.6.1",
+    "@worldwideview/wwv-plugin-aviation": "*",
+    "@worldwideview/wwv-plugin-borders": "*",
+    "@worldwideview/wwv-plugin-camera": "*",
+    "@worldwideview/wwv-plugin-maritime": "*",
+    "@worldwideview/wwv-plugin-military-aviation": "*",
+    "@worldwideview/wwv-plugin-sdk": "*",
+    "@worldwideview/wwv-plugin-wildfire": "*",
     "bcryptjs": "^3.0.3",
     "cesium": "^1.139.0",
     "cheerio": "^1.2.0",
@@ -39,6 +41,7 @@
     "react-dom": "19.2.3",
     "react-player": "^3.4.0",
     "resium": "^1.19.4",
+    "satellite.js": "^7.0.0",
     "tslib": "^2.8.1",
     "ws": "^8.14.2",
     "zustand": "^5.0.11"
@@ -47,6 +50,7 @@
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
     "@types/bcryptjs": "^3.0.0",
+    "@types/cesium": "^1.70.4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

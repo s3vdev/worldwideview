@@ -74,6 +74,7 @@ export const createUISlice: StateCreator<AppStore, [], [], UISlice> = (set) => (
             selectedEntity: entity,
             rightSidebarOpen: entity !== null,
             configPanelOpen: entity !== null,
+            openMobilePanel: entity !== null ? "right" : null,
             activeConfigTab: entity !== null ? "intel" : "filters"
         });
     },

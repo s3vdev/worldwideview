@@ -10,6 +10,8 @@ import {
     Cartesian3,
     Math as CesiumMath,
     Entity as CesiumEntity,
+    CameraEventType,
+    KeyboardEventModifier,
 } from "cesium";
 import { useStore } from "@/core/state/store";
 import { pluginManager } from "@/core/plugins/PluginManager";
@@ -150,6 +152,28 @@ export default function GlobeView() {
         }
 
         initPrimitiveCollections(viewer);
+
+        // Reconfigure mouse bindings so right-click tilts/turns instead of zooming
+        const sscc = viewer.scene.screenSpaceCameraController;
+        sscc.tiltEventTypes = [
+            CameraEventType.RIGHT_DRAG,
+            CameraEventType.PINCH,
+            { eventType: CameraEventType.LEFT_DRAG, modifier: KeyboardEventModifier.CTRL },
+            { eventType: CameraEventType.RIGHT_DRAG, modifier: KeyboardEventModifier.CTRL }
+        ];
+        sscc.zoomEventTypes = [
+            CameraEventType.MIDDLE_DRAG,
+            CameraEventType.WHEEL,
+            CameraEventType.PINCH
+        ];
+
+        // Increase touch sensitivity on mobile for pinch-zoom and pan
+        if ("ontouchstart" in window || navigator.maxTouchPoints > 0) {
+            (sscc as any)._zoomFactor = 15;        // default 5  → 3× more sensitive pinch-zoom
+            (sscc as any)._translateFactor = 2;     // default 1  → 2× more sensitive pan
+            (sscc as any)._tiltFactor = 50;         // default ~25 → 2× more sensitive tilt (two-finger drag up/down)
+        }
+
         setViewerReady(true);
     }, [sceneSettings]);
 

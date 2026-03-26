@@ -16,6 +16,7 @@ import { WildfirePlugin } from "@worldwideview/wwv-plugin-wildfire";
 import { BordersPlugin } from "@worldwideview/wwv-plugin-borders";
 import { CameraPlugin } from "@worldwideview/wwv-plugin-camera";
 import { MilitaryPlugin } from "@worldwideview/wwv-plugin-military-aviation";
+import { SatellitePlugin } from "@worldwideview/wwv-plugin-satellite";
 import { useStore } from "@/core/state/store";
 import { dataBus } from "@/core/data/DataBus";
 import { PanelToggleArrows } from "@/components/layout/PanelToggleArrows";
@@ -66,6 +67,7 @@ export function AppShell() {
                 new BordersPlugin(),
                 new CameraPlugin(),
                 new MilitaryPlugin(),
+                new SatellitePlugin(),
             ];
 
             for (const plugin of builtIns) {

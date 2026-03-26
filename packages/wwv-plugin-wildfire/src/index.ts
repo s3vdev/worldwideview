@@ -24,6 +24,13 @@ function frpToSize(frp: number): number {
     return 12;
 }
 
+function getFrpBand(frp: number): string {
+    if (frp < 10) return "low";
+    if (frp < 50) return "moderate";
+    if (frp < 100) return "high";
+    return "extreme";
+}
+
 export class WildfirePlugin implements WorldPlugin {
     id = "wildfire";
     name = "Wildfire";
@@ -55,7 +62,7 @@ export class WildfirePlugin implements WorldPlugin {
                 timestamp: new Date(`${fire.acq_date}T${fire.acq_time.padStart(4, "0").slice(0, 2)}:${fire.acq_time.padStart(4, "0").slice(2)}:00Z`),
                 label: `FRP: ${fire.frp}`,
                 properties: {
-                    frp: fire.frp, confidence: fire.confidence, satellite: fire.satellite,
+                    frp: fire.frp, frp_band: getFrpBand(fire.frp), confidence: fire.confidence, satellite: fire.satellite,
                     acq_date: fire.acq_date, acq_time: fire.acq_time,
                     bright_ti4: fire.bright_ti4, bright_ti5: fire.bright_ti5, tier: fire.tier,
                 },
@@ -89,6 +96,15 @@ export class WildfirePlugin implements WorldPlugin {
         return [
             { id: "frp", label: "Fire Radiative Power (MW)", type: "range", propertyKey: "frp", range: { min: 0, max: 500, step: 10 } },
             {
+                id: "frp_band", label: "Intensity Category", type: "select", propertyKey: "frp_band",
+                options: [
+                    { value: "low", label: "FRP < 10 (Low)" },
+                    { value: "moderate", label: "FRP 10 - 50 (Moderate)" },
+                    { value: "high", label: "FRP 50 - 100 (High)" },
+                    { value: "extreme", label: "FRP > 100 (Extreme)" },
+                ]
+            },
+            {
                 id: "confidence", label: "Confidence", type: "select", propertyKey: "confidence",
                 options: [{ value: "low", label: "Low" }, { value: "nominal", label: "Nominal" }, { value: "high", label: "High" }],
             },
@@ -101,10 +117,10 @@ export class WildfirePlugin implements WorldPlugin {
 
     getLegend(): { label: string; color: string; filterId?: string; filterValue?: string }[] {
         return [
-            { label: "FRP < 10 (Low)", color: "#fbbf24" },
-            { label: "FRP 10 - 50 (Moderate)", color: "#f97316" },
-            { label: "FRP 50 - 100 (High)", color: "#ef4444" },
-            { label: "FRP > 100 (Extreme)", color: "#dc2626" },
+            { label: "FRP < 10 (Low)", color: "#fbbf24", filterId: "frp_band", filterValue: "low" },
+            { label: "FRP 10 - 50 (Moderate)", color: "#f97316", filterId: "frp_band", filterValue: "moderate" },
+            { label: "FRP 50 - 100 (High)", color: "#ef4444", filterId: "frp_band", filterValue: "high" },
+            { label: "FRP > 100 (Extreme)", color: "#dc2626", filterId: "frp_band", filterValue: "extreme" },
         ];
     }
 }

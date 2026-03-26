@@ -1,6 +1,6 @@
 {
   "name": "@worldwideview/wwv-plugin-wildfire",
-  "version": "1.0.4",
+  "version": "1.0.6",
   "description": "WorldWideView plugin for active wildfire and hotspot detection using NASA FIRMS (VIIRS) satellite data. Supports tiered LOD rendering and FRP-based sizing",
   "main": "src/index.ts",
   "types": "src/index.ts",

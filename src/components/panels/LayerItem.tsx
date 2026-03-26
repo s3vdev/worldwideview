@@ -38,7 +38,7 @@ function TrustIcon({ trust }: { trust: TrustTier }) {
     return (
         <span
             className="layer-item__unverified-icon-wrapper"
-            title="Unverified plugin, use at your own risk"
+            data-tooltip="Unverified plugin, use at your own risk"
         >
             <ShieldAlert
                 size={12}

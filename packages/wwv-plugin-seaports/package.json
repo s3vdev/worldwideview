@@ -26,5 +26,11 @@
   "author": "WorldWideView",
   "peerDependencies": {
     "@worldwideview/wwv-plugin-sdk": "*"
+  },
+  "worldwideview": {
+    "id": "seaports",
+    "icon": "Anchor",
+    "category": "Maritime",
+    "format": "static"
   }
 }

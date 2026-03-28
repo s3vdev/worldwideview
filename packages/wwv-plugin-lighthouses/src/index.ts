@@ -1,9 +1,9 @@
-import { Lamp } from "lucide-react";
-import type {
-    WorldPlugin, GeoEntity, TimeRange, PluginContext,
-    LayerConfig, CesiumEntityOptions,
+import { Lamp, Lightbulb } from "lucide-react";
+import {
+    createSvgIconUrl,
+    type WorldPlugin, type GeoEntity, type TimeRange, type PluginContext,
+    type LayerConfig, type CesiumEntityOptions,
 } from "@worldwideview/wwv-plugin-sdk";
-
 export class LighthousesPlugin implements WorldPlugin {
     id = "lighthouses";
     name = "Lighthouses";
@@ -11,6 +11,7 @@ export class LighthousesPlugin implements WorldPlugin {
     icon = Lamp;
     category = "maritime" as const;
     version = "1.0.0";
+    private iconUrl?: string;
 
     async initialize(_ctx: PluginContext): Promise<void> { }
     destroy(): void { }
@@ -27,6 +28,9 @@ export class LighthousesPlugin implements WorldPlugin {
     }
 
     renderEntity(_e: GeoEntity): CesiumEntityOptions {
-        return { type: "point", color: "#facc15", size: 8 };
+        if (!this.iconUrl) {
+            this.iconUrl = createSvgIconUrl(Lightbulb, { color: "#facc15", size: 24 });
+        }
+        return { type: "billboard", iconUrl: this.iconUrl, color: "#facc15" };
     }
 }

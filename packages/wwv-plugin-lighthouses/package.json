@@ -26,5 +26,11 @@
   "author": "WorldWideView",
   "peerDependencies": {
     "@worldwideview/wwv-plugin-sdk": "*"
+  },
+  "worldwideview": {
+    "id": "lighthouses",
+    "icon": "Lamp",
+    "category": "Maritime",
+    "format": "static"
   }
 }

@@ -1,9 +1,9 @@
 import { Anchor } from "lucide-react";
-import type {
-    WorldPlugin, GeoEntity, TimeRange, PluginContext,
-    LayerConfig, CesiumEntityOptions,
+import {
+    createSvgIconUrl,
+    type WorldPlugin, type GeoEntity, type TimeRange, type PluginContext,
+    type LayerConfig, type CesiumEntityOptions,
 } from "@worldwideview/wwv-plugin-sdk";
-
 export class SeaportsPlugin implements WorldPlugin {
     id = "seaports";
     name = "Seaports";
@@ -11,6 +11,7 @@ export class SeaportsPlugin implements WorldPlugin {
     icon = Anchor;
     category = "maritime" as const;
     version = "1.0.0";
+    private iconUrl?: string;
 
     async initialize(_ctx: PluginContext): Promise<void> { }
     destroy(): void { }
@@ -27,6 +28,9 @@ export class SeaportsPlugin implements WorldPlugin {
     }
 
     renderEntity(_e: GeoEntity): CesiumEntityOptions {
-        return { type: "point", color: "#0ea5e9", size: 8 };
+        if (!this.iconUrl) {
+            this.iconUrl = createSvgIconUrl(Anchor, { color: "#0ea5e9", size: 24 });
+        }
+        return { type: "billboard", iconUrl: this.iconUrl, color: "#0ea5e9" };
     }
 }

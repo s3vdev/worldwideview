@@ -26,5 +26,11 @@
   "author": "WorldWideView",
   "peerDependencies": {
     "@worldwideview/wwv-plugin-sdk": "*"
+  },
+  "worldwideview": {
+    "id": "volcanoes",
+    "icon": "Mountain",
+    "category": "Natural Disaster",
+    "format": "static"
   }
 }

@@ -31,5 +31,11 @@
   "author": "WorldWideView",
   "peerDependencies": {
     "@worldwideview/wwv-plugin-sdk": "*"
+  },
+  "worldwideview": {
+    "id": "nuclear-facilities",
+    "icon": "Atom",
+    "category": "Infrastructure",
+    "format": "static"
   }
 }

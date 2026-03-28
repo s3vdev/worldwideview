@@ -69,14 +69,14 @@ export class AviationPlugin implements WorldPlugin {
                     speed: (s.speed as number) || undefined,
                     timestamp: new Date(s.timestamp as string),
                     label: (s.callsign as string) || (s.icao24 as string),
-                    properties: { 
-                        icao24: s.icao24, 
-                        callsign: s.callsign, 
-                        altitude_m: s.altitude, 
+                    properties: {
+                        icao24: s.icao24,
+                        callsign: s.callsign,
+                        altitude_m: s.altitude,
                         altitude_band: getAltitudeBand((s.altitude as number) || 0),
-                        velocity_ms: s.speed, 
-                        heading: s.heading, 
-                        on_ground: (s.altitude as number) === null || (s.altitude as number) <= 0 
+                        velocity_ms: s.speed,
+                        heading: s.heading,
+                        on_ground: (s.altitude as number) === null || (s.altitude as number) <= 0
                     },
                 }));
             }
@@ -107,17 +107,17 @@ export class AviationPlugin implements WorldPlugin {
                         heading: st.true_track || undefined, speed: st.velocity || undefined,
                         timestamp: new Date((st.time_position || st.last_contact) * 1000),
                         label: st.callsign || st.icao24,
-                        properties: { 
-                            icao24: st.icao24, 
-                            callsign: st.callsign, 
-                            origin_country: st.origin_country, 
-                            altitude_m: st.baro_altitude, 
+                        properties: {
+                            icao24: st.icao24,
+                            callsign: st.callsign,
+                            origin_country: st.origin_country,
+                            altitude_m: st.baro_altitude,
                             altitude_band: getAltitudeBand(st.baro_altitude || 0),
-                            velocity_ms: st.velocity, 
-                            heading: st.true_track, 
-                            vertical_rate: st.vertical_rate, 
-                            on_ground: st.on_ground, 
-                            squawk: st.squawk 
+                            velocity_ms: st.velocity,
+                            heading: st.true_track,
+                            vertical_rate: st.vertical_rate,
+                            on_ground: st.on_ground,
+                            squawk: st.squawk
                         },
                     };
                 });
@@ -138,6 +138,7 @@ export class AviationPlugin implements WorldPlugin {
             modelUrl: "/airplane/scene.gltf", modelScale: 75, modelMinPixelSize: 16, modelHeadingOffset: 180,
             color: altitudeToColor(alt), rotation: entity.heading,
             labelText: entity.label || undefined, labelFont: "11px JetBrains Mono, monospace",
+            disableDepthTestDistance: undefined,
         };
     }
 
@@ -164,15 +165,15 @@ export class AviationPlugin implements WorldPlugin {
         return [
             { id: "origin_country", label: "Country", type: "select", propertyKey: "origin_country", options: [{ value: "United States", label: "United States" }, { value: "China", label: "China" }, { value: "United Kingdom", label: "United Kingdom" }, { value: "Germany", label: "Germany" }, { value: "France", label: "France" }, { value: "Japan", label: "Japan" }, { value: "Australia", label: "Australia" }, { value: "Canada", label: "Canada" }, { value: "India", label: "India" }, { value: "Brazil", label: "Brazil" }, { value: "Russia", label: "Russia" }, { value: "Turkey", label: "Turkey" }, { value: "South Korea", label: "South Korea" }, { value: "Indonesia", label: "Indonesia" }, { value: "Mexico", label: "Mexico" }] },
             { id: "altitude", label: "Altitude (m)", type: "range", propertyKey: "altitude_m", range: { min: 0, max: 15000, step: 500 } },
-            { 
-                id: "altitude_band", label: "Altitude Category", type: "select", propertyKey: "altitude_band", 
+            {
+                id: "altitude_band", label: "Altitude Category", type: "select", propertyKey: "altitude_band",
                 options: [
                     { value: "grounded", label: "0 m (Grounded)" },
                     { value: "low", label: "< 3,000 m" },
                     { value: "mid", label: "3,000 - 8,000 m" },
                     { value: "high", label: "8,000 - 12,000 m" },
                     { value: "extreme", label: "> 12,000 m" },
-                ] 
+                ]
             },
             { id: "on_ground", label: "On Ground", type: "boolean", propertyKey: "on_ground" },
             { id: "callsign", label: "Callsign", type: "text", propertyKey: "callsign" },

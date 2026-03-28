@@ -30,5 +30,11 @@
   "author": "WorldWideView",
   "peerDependencies": {
     "@worldwideview/wwv-plugin-sdk": "*"
+  },
+  "worldwideview": {
+    "id": "borders",
+    "icon": "Map",
+    "category": "Custom",
+    "format": "bundle"
   }
 }

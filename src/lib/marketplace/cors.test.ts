@@ -20,6 +20,17 @@ describe("CORS utility", () => {
             expect(headers["Access-Control-Allow-Origin"]).toBe("https://marketplace.worldwideview.dev");
         });
 
+        it("returns allowed origin for local network IPs", () => {
+            const headers1 = corsHeaders(fakeRequest("http://192.168.68.53:3001"));
+            expect(headers1["Access-Control-Allow-Origin"]).toBe("http://192.168.68.53:3001");
+
+            const headers2 = corsHeaders(fakeRequest("http://10.0.0.5:8080"));
+            expect(headers2["Access-Control-Allow-Origin"]).toBe("http://10.0.0.5:8080");
+
+            const headers3 = corsHeaders(fakeRequest("http://127.0.0.1:4000"));
+            expect(headers3["Access-Control-Allow-Origin"]).toBe("http://127.0.0.1:4000");
+        });
+
         it("returns no CORS headers for unknown origins", () => {
             const headers = corsHeaders(fakeRequest("http://evil.com"));
             expect(headers["Access-Control-Allow-Origin"]).toBeUndefined();
@@ -30,6 +41,7 @@ describe("CORS utility", () => {
             expect(headers["Access-Control-Allow-Methods"]).toContain("GET");
             expect(headers["Access-Control-Allow-Methods"]).toContain("POST");
             expect(headers["Access-Control-Allow-Headers"]).toContain("Authorization");
+            expect(headers["Access-Control-Allow-Private-Network"]).toBe("true");
         });
     });
 

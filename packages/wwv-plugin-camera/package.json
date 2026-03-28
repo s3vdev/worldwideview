@@ -33,5 +33,11 @@
     "@worldwideview/wwv-plugin-sdk": "*",
     "react": ">=18",
     "lucide-react": ">=0.576.0"
+  },
+  "worldwideview": {
+    "id": "camera",
+    "icon": "Camera",
+    "category": "Infrastructure",
+    "format": "bundle"
   }
 }

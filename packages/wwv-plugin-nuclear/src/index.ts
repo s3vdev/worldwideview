@@ -1,11 +1,12 @@
-import { Atom } from "lucide-react";
-import type {
-    WorldPlugin,
-    GeoEntity,
-    TimeRange,
-    PluginContext,
-    LayerConfig,
-    CesiumEntityOptions,
+import { Atom, Radiation } from "lucide-react";
+import {
+    createSvgIconUrl,
+    type WorldPlugin,
+    type GeoEntity,
+    type TimeRange,
+    type PluginContext,
+    type LayerConfig,
+    type CesiumEntityOptions,
 } from "@worldwideview/wwv-plugin-sdk";
 
 export class NuclearPlugin implements WorldPlugin {
@@ -15,6 +16,7 @@ export class NuclearPlugin implements WorldPlugin {
     icon = Atom;
     category = "infrastructure" as const;
     version = "1.0.0";
+    private iconUrl?: string;
 
     async initialize(_ctx: PluginContext): Promise<void> { }
     destroy(): void { }
@@ -36,6 +38,9 @@ export class NuclearPlugin implements WorldPlugin {
     }
 
     renderEntity(_entity: GeoEntity): CesiumEntityOptions {
-        return { type: "point", color: "#22d3ee", size: 8 };
+        if (!this.iconUrl) {
+            this.iconUrl = createSvgIconUrl(Radiation, { color: "#22d3ee", size: 24 });
+        }
+        return { type: "billboard", iconUrl: this.iconUrl, color: "#22d3ee" };
     }
 }

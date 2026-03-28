@@ -26,5 +26,11 @@
   "author": "WorldWideView",
   "peerDependencies": {
     "@worldwideview/wwv-plugin-sdk": "*"
+  },
+  "worldwideview": {
+    "id": "airports",
+    "icon": "PlaneTakeoff",
+    "category": "Aviation",
+    "format": "static"
   }
 }

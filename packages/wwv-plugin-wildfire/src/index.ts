@@ -1,12 +1,13 @@
 import { Flame } from "lucide-react";
-import type {
-    WorldPlugin,
-    GeoEntity,
-    TimeRange,
-    PluginContext,
-    LayerConfig,
-    CesiumEntityOptions,
-    FilterDefinition,
+import {
+    createSvgIconUrl,
+    type WorldPlugin,
+    type GeoEntity,
+    type TimeRange,
+    type PluginContext,
+    type LayerConfig,
+    type CesiumEntityOptions,
+    type FilterDefinition,
 } from "@worldwideview/wwv-plugin-sdk";
 import { buildUserKeyHeaders } from "@/lib/userApiKeys";
 
@@ -39,6 +40,7 @@ export class WildfirePlugin implements WorldPlugin {
     category = "natural-disaster" as const;
     version = "1.0.0";
     private context: PluginContext | null = null;
+    private iconUrls: Record<string, string> = {};
 
     async initialize(ctx: PluginContext): Promise<void> { this.context = ctx; }
     destroy(): void { this.context = null; }
@@ -80,13 +82,19 @@ export class WildfirePlugin implements WorldPlugin {
 
     renderEntity(entity: GeoEntity): CesiumEntityOptions {
         const frp = (entity.properties.frp as number) || 0;
+        const color = frpToColor(frp);
         const tier = (entity.properties.tier as number) || 3;
         let distanceDisplayCondition: { near: number; far: number } | undefined;
         if (tier === 1) distanceDisplayCondition = { near: 3500000, far: Number.POSITIVE_INFINITY };
         else if (tier === 2) distanceDisplayCondition = { near: 1000000, far: 3500000 };
         else if (tier === 3) distanceDisplayCondition = { near: 0, far: 1000000 };
+
+        if (!this.iconUrls[color]) {
+            this.iconUrls[color] = createSvgIconUrl(Flame, { color, size: 24 });
+        }
+
         return {
-            type: "point", color: frpToColor(frp),
+            type: "billboard", iconUrl: this.iconUrls[color], color,
             size: frpToSize(frp) * (tier === 1 ? 2 : tier === 2 ? 1.5 : 1),
             outlineColor: "#000000", outlineWidth: 1, distanceDisplayCondition,
         };

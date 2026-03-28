@@ -1,9 +1,9 @@
 import { PlaneTakeoff } from "lucide-react";
-import type {
-    WorldPlugin, GeoEntity, TimeRange, PluginContext,
-    LayerConfig, CesiumEntityOptions,
+import {
+    createSvgIconUrl,
+    type WorldPlugin, type GeoEntity, type TimeRange, type PluginContext,
+    type LayerConfig, type CesiumEntityOptions,
 } from "@worldwideview/wwv-plugin-sdk";
-
 export class AirportsPlugin implements WorldPlugin {
     id = "airports";
     name = "Airports";
@@ -11,6 +11,7 @@ export class AirportsPlugin implements WorldPlugin {
     icon = PlaneTakeoff;
     category = "aviation" as const;
     version = "1.0.0";
+    private iconUrl?: string;
 
     async initialize(_ctx: PluginContext): Promise<void> { }
     destroy(): void { }
@@ -27,6 +28,9 @@ export class AirportsPlugin implements WorldPlugin {
     }
 
     renderEntity(_e: GeoEntity): CesiumEntityOptions {
-        return { type: "point", color: "#3b82f6", size: 8 };
+        if (!this.iconUrl) {
+            this.iconUrl = createSvgIconUrl(PlaneTakeoff, { color: "#3b82f6", size: 24 });
+        }
+        return { type: "billboard", iconUrl: this.iconUrl, color: "#3b82f6" };
     }
 }

@@ -4,6 +4,19 @@ import webpack from "webpack";
 const nextConfig: NextConfig = {
   output: "standalone",
   serverExternalPackages: ["better-sqlite3", "@prisma/adapter-better-sqlite3", "@prisma/client", "prisma"],
+  transpilePackages: [
+    "@worldwideview/wwv-plugin-aviation",
+    "@worldwideview/wwv-plugin-borders",
+    "@worldwideview/wwv-plugin-camera",
+    "@worldwideview/wwv-plugin-maritime",
+    "@worldwideview/wwv-plugin-military-aviation",
+    "@worldwideview/wwv-plugin-satellite",
+    "@worldwideview/wwv-plugin-sdk",
+    "@worldwideview/wwv-plugin-wildfire",
+    "resium",
+    "react-player",
+    "satellite.js"
+  ],
   async headers() {
     return [
       {

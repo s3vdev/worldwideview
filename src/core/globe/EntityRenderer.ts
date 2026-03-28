@@ -59,7 +59,7 @@ export function createLabel(item: AnimatableItem, labels: LabelCollection): void
         fillColor: Color.WHITE, outlineColor: Color.BLACK, outlineWidth: 2,
         verticalOrigin: VerticalOrigin.BOTTOM, pixelOffset: { x: 0, y: -12 } as any,
         show: true, id: clickId,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        disableDepthTestDistance: item.options.disableDepthTestDistance ?? Number.POSITIVE_INFINITY,
         translucencyByDistance: new NearFarScalar(1e3, 1.0, 5e5, 0.0),
         distanceDisplayCondition: item.options.distanceDisplayCondition
             ? new DistanceDisplayCondition(item.options.distanceDisplayCondition.near, item.options.distanceDisplayCondition.far)

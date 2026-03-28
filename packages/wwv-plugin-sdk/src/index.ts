@@ -3,6 +3,13 @@
 // Import from "@worldwideview/wwv-plugin-sdk" in your plugin.
 
 import type { ComponentType } from "react";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+
+export function createSvgIconUrl(Icon: ComponentType<any>, props: any = {}): string {
+    const svgString = renderToStaticMarkup(createElement(Icon, props));
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgString)}`;
+}
 
 // ─── Re-export manifest types ─────────────────────────────────
 export type { PluginManifest, PluginFormat, PluginType, TrustTier, PluginCapability, DataSourceConfig, FieldMapping, RenderingConfig } from "./manifest";
@@ -62,6 +69,7 @@ export interface CesiumEntityOptions {
     labelText?: string;
     labelFont?: string;
     distanceDisplayCondition?: { near: number; far: number };
+    disableDepthTestDistance?: number;
     modelUrl?: string;
     modelScale?: number;
     modelMinPixelSize?: number;

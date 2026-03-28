@@ -146,7 +146,6 @@ export function useSearch() {
     const [isOpen, setIsOpen] = useState(false);
     const [liveSections, setLiveSections] = useState<SearchSection[]>([]);
     const [selectedIndex, setSelectedIndex] = useState(0);
-    const layers = useStore((s) => s.layers);
     const setCameraPosition = useStore((s) => s.setCameraPosition);
     const setSelectedEntity = useStore((s) => s.setSelectedEntity);
     const { history, addToHistory, clearHistory } = useSearchHistory();
@@ -173,6 +172,9 @@ export function useSearch() {
     const flatResults = sections.flatMap((s) => s.results);
 
     // Debounced search
+    // Note: `layers` is read inside the callback via useStore.getState()
+    // rather than being a dependency, because its object reference changes
+    // on every entity-count / loading update, which would reset the debounce.
     useEffect(() => {
         if (!query.trim()) {
             setLiveSections((prev) => (prev.length === 0 ? prev : []));
@@ -182,7 +184,8 @@ export function useSearch() {
         let isStale = false;
 
         const run = async () => {
-            const newSections = searchEntities(query, layers);
+            const currentLayers = useStore.getState().layers;
+            const newSections = searchEntities(query, currentLayers);
             const locationSection = await searchLocations(query);
             if (isStale) return;
             if (locationSection) newSections.push(locationSection);
@@ -193,7 +196,7 @@ export function useSearch() {
 
         const timer = setTimeout(run, 300);
         return () => { isStale = true; clearTimeout(timer); };
-    }, [query, layers]);
+    }, [query]);
 
     // Selection handler
     const handleSelect = async (result: SearchResult) => {

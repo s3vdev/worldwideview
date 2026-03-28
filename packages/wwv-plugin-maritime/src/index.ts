@@ -1,12 +1,13 @@
 import { Ship } from "lucide-react";
-import type {
-    WorldPlugin,
-    GeoEntity,
-    TimeRange,
-    PluginContext,
-    LayerConfig,
-    CesiumEntityOptions,
-    FilterDefinition,
+import {
+    createSvgIconUrl,
+    type WorldPlugin,
+    type GeoEntity,
+    type TimeRange,
+    type PluginContext,
+    type LayerConfig,
+    type CesiumEntityOptions,
+    type FilterDefinition,
 } from "@worldwideview/wwv-plugin-sdk";
 
 const VESSEL_COLORS: Record<string, string> = {
@@ -68,6 +69,7 @@ export class MaritimePlugin implements WorldPlugin {
     category = "maritime" as const;
     version = "1.0.0";
     private context: PluginContext | null = null;
+    private iconUrls: Record<string, string> = {};
 
     async initialize(ctx: PluginContext): Promise<void> { this.context = ctx; }
     destroy(): void { this.context = null; }
@@ -92,8 +94,12 @@ export class MaritimePlugin implements WorldPlugin {
 
     renderEntity(entity: GeoEntity): CesiumEntityOptions {
         const vesselType = (entity.properties.vesselType as string) || "other";
+        const color = getVesselColor(vesselType);
+        if (!this.iconUrls[color]) {
+            this.iconUrls[color] = createSvgIconUrl(Ship, { color, size: 24 });
+        }
         return {
-            type: "point", color: getVesselColor(vesselType), size: 7,
+            type: "billboard", iconUrl: this.iconUrls[color], color,
             rotation: entity.heading, outlineColor: "#000000", outlineWidth: 1,
             labelText: entity.label || undefined, labelFont: "11px JetBrains Mono, monospace",
         };

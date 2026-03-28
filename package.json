@@ -2,9 +2,6 @@
   "name": "worldwideview",
   "version": "0.1.0",
   "private": true,
-  "workspaces": [
-    "packages/*"
-  ],
   "scripts": {
     "setup": "node scripts/setup.mjs",
     "clean": "node -e \"const fs=require('fs');fs.rmSync('.next',{recursive:true,force:true})\"",
@@ -26,6 +23,7 @@
     "@worldwideview/wwv-plugin-camera": "*",
     "@worldwideview/wwv-plugin-maritime": "*",
     "@worldwideview/wwv-plugin-military-aviation": "*",
+    "@worldwideview/wwv-plugin-satellite": "*",
     "@worldwideview/wwv-plugin-sdk": "*",
     "@worldwideview/wwv-plugin-wildfire": "*",
     "bcryptjs": "^3.0.3",
@@ -34,13 +32,13 @@
     "hls.js": "^1.6.15",
     "insecam-api": "^0.0.3",
     "lucide-react": "^0.576.0",
-    "next": "16.1.6",
+    "next": "16.2.1",
     "next-auth": "^5.0.0-beta.30",
     "prisma": "^7.5.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-player": "^3.4.0",
-    "resium": "^1.19.4",
+    "resium": "1.19.4",
     "satellite.js": "^7.0.0",
     "tslib": "^2.8.1",
     "ws": "^8.14.2",
@@ -60,5 +58,15 @@
     "jsdom": "^28.1.0",
     "typescript": "^5",
     "vitest": "^4.0.18"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/engines",
+      "better-sqlite3",
+      "prisma",
+      "protobufjs",
+      "sharp",
+      "unrs-resolver"
+    ]
   }
 }

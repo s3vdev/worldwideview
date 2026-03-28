@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -19,15 +23,36 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"],
-      "@worldwideview/wwv-plugin-sdk": ["./packages/wwv-plugin-sdk/src"],
-      "@worldwideview/wwv-plugin-aviation": ["./packages/wwv-plugin-aviation/src"],
-      "@worldwideview/wwv-plugin-maritime": ["./packages/wwv-plugin-maritime/src"],
-      "@worldwideview/wwv-plugin-wildfire": ["./packages/wwv-plugin-wildfire/src"],
-      "@worldwideview/wwv-plugin-borders": ["./packages/wwv-plugin-borders/src"],
-      "@worldwideview/wwv-plugin-camera": ["./packages/wwv-plugin-camera/src"],
-      "@worldwideview/wwv-plugin-camera/*": ["./packages/wwv-plugin-camera/src/*"],
-      "@worldwideview/wwv-plugin-military-aviation": ["./packages/wwv-plugin-military-aviation/src"]
+      "@/*": [
+        "./src/*"
+      ],
+      "@worldwideview/wwv-plugin-sdk": [
+        "./packages/wwv-plugin-sdk/src"
+      ],
+      "@worldwideview/wwv-plugin-aviation": [
+        "./packages/wwv-plugin-aviation/src"
+      ],
+      "@worldwideview/wwv-plugin-maritime": [
+        "./packages/wwv-plugin-maritime/src"
+      ],
+      "@worldwideview/wwv-plugin-wildfire": [
+        "./packages/wwv-plugin-wildfire/src"
+      ],
+      "@worldwideview/wwv-plugin-borders": [
+        "./packages/wwv-plugin-borders/src"
+      ],
+      "@worldwideview/wwv-plugin-camera": [
+        "./packages/wwv-plugin-camera/src"
+      ],
+      "@worldwideview/wwv-plugin-camera/*": [
+        "./packages/wwv-plugin-camera/src/*"
+      ],
+      "@worldwideview/wwv-plugin-military-aviation": [
+        "./packages/wwv-plugin-military-aviation/src"
+      ],
+      "@worldwideview/wwv-plugin-satellite": [
+        "./packages/wwv-plugin-satellite/src"
+      ]
     }
   },
   "include": [
@@ -38,5 +63,7 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules"
+  ]
 }

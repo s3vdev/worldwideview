@@ -1,14 +1,15 @@
 import { Satellite } from "lucide-react";
-import type {
-    WorldPlugin,
-    GeoEntity,
-    TimeRange,
-    PluginContext,
-    LayerConfig,
-    CesiumEntityOptions,
-    SelectionBehavior,
-    FilterDefinition,
-    ServerPluginConfig,
+import {
+    createSvgIconUrl,
+    type WorldPlugin,
+    type GeoEntity,
+    type TimeRange,
+    type PluginContext,
+    type LayerConfig,
+    type CesiumEntityOptions,
+    type SelectionBehavior,
+    type FilterDefinition,
+    type ServerPluginConfig,
 } from "@worldwideview/wwv-plugin-sdk";
 
 /** Color map by CelesTrak group. */
@@ -49,6 +50,7 @@ export class SatellitePlugin implements WorldPlugin {
     version = "1.0.0";
 
     private context: PluginContext | null = null;
+    private iconUrls: Record<string, string> = {};
 
     async initialize(ctx: PluginContext): Promise<void> {
         this.context = ctx;
@@ -109,9 +111,14 @@ export class SatellitePlugin implements WorldPlugin {
     renderEntity(entity: GeoEntity): CesiumEntityOptions {
         const group = (entity.properties.group as string) || "";
         const isStation = group === "stations";
+        const color = groupColor(group);
+
+        if (!this.iconUrls[color]) {
+            this.iconUrls[color] = createSvgIconUrl(Satellite, { color, size: 24 });
+        }
+
         return {
-            type: "point",
-            color: groupColor(group),
+            type: "billboard", iconUrl: this.iconUrls[color], color,
             size: isStation ? 12 : 6,
             outlineColor: "#000000",
             outlineWidth: 1,

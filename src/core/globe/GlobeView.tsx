@@ -156,13 +156,13 @@ export default function GlobeView() {
         // Reconfigure mouse bindings so right-click tilts/turns instead of zooming
         const sscc = viewer.scene.screenSpaceCameraController;
         sscc.tiltEventTypes = [
+            CameraEventType.MIDDLE_DRAG,
             CameraEventType.RIGHT_DRAG,
             CameraEventType.PINCH,
             { eventType: CameraEventType.LEFT_DRAG, modifier: KeyboardEventModifier.CTRL },
             { eventType: CameraEventType.RIGHT_DRAG, modifier: KeyboardEventModifier.CTRL }
         ];
         sscc.zoomEventTypes = [
-            CameraEventType.MIDDLE_DRAG,
             CameraEventType.WHEEL,
             CameraEventType.PINCH
         ];

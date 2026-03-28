@@ -26,5 +26,11 @@
   "author": "WorldWideView",
   "peerDependencies": {
     "@worldwideview/wwv-plugin-sdk": "*"
+  },
+  "worldwideview": {
+    "id": "embassies",
+    "icon": "Landmark",
+    "category": "Custom",
+    "format": "static"
   }
 }

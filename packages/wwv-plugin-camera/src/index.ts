@@ -1,7 +1,8 @@
 import { Camera } from "lucide-react";
-import type {
-    WorldPlugin, GeoEntity, TimeRange, PluginContext,
-    LayerConfig, CesiumEntityOptions, FilterDefinition,
+import {
+    createSvgIconUrl,
+    type WorldPlugin, type GeoEntity, type TimeRange, type PluginContext,
+    type LayerConfig, type CesiumEntityOptions, type FilterDefinition,
 } from "@worldwideview/wwv-plugin-sdk";
 import { CameraDetail } from "./CameraDetail";
 import { CameraSettings as CameraSettingsComponent } from "./CameraSettings";
@@ -27,6 +28,7 @@ export class CameraPlugin implements WorldPlugin {
     private context: PluginContext | null = null;
     private sourceBuckets: Record<string, GeoEntity[]> = {};
     private lastActionId: number | null = null;
+    private iconUrl?: string;
 
     async initialize(ctx: PluginContext): Promise<void> { this.context = ctx; }
     destroy(): void { this.context = null; }
@@ -141,8 +143,11 @@ export class CameraPlugin implements WorldPlugin {
     }
 
     renderEntity(entity: GeoEntity): CesiumEntityOptions {
+        if (!this.iconUrl) {
+            this.iconUrl = createSvgIconUrl(Camera, { color: "#60a5fa", size: 24 });
+        }
         return {
-            type: "point", color: "#60a5fa", size: 6,
+            type: "billboard", iconUrl: this.iconUrl, color: "#60a5fa",
             outlineColor: "#ffffff", outlineWidth: 1.5,
             labelText: entity.label, labelFont: "11px Inter, system-ui, sans-serif",
         };

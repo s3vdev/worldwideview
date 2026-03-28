@@ -61,9 +61,22 @@ Create `package.json`:
   "author": "WorldWideView",
   "peerDependencies": {
     "@worldwideview/wwv-plugin-sdk": "*"
+  },
+  "worldwideview": {
+    "id": "my-data",
+    "icon": "MapPin",
+    "category": "Custom",
+    "format": "bundle"
   }
 }
 ```
+
+> [!IMPORTANT]
+> The `"worldwideview"` object block is strictly required if you intend to publish your plugin to the WorldWideView Marketplace. The marketplace uses this internal manifest to determine how to categorize and display your plugin automatically.
+> * `id`: The unique string identifier.
+> * `icon`: The Lucide React icon name (e.g. `MapPin`, `Satellite`, `Plane`).
+> * `category`: Must match an existing category (e.g. `Aviation`, `Maritime`, `Natural Disaster`, `Custom`).
+> * `format`: Either `bundle`, `static`, or `declarative`.
 
 > [!IMPORTANT]
 > The SDK is declared as a **peer dependency**, not a direct dependency. The host application provides it at runtime.

@@ -66,6 +66,7 @@ export function createUpdateLoop(
 
         const Dh = Math.sqrt(camDistSqr - R2);
         const frame = frameCount++;
+        (window as any)._wwvFrameCount = frame; // Expose globally for throttling
         const isStaticCullFrame = frame % STATIC_HORIZON_INTERVAL === 0;
         const selectedId = state.selectedEntity?.id ?? null;
         const hoveredId = hoveredEntityIdRef.current;
@@ -74,19 +75,19 @@ export function createUpdateLoop(
 
         // Pass 1: Dynamic entities — every frame
         for (let i = 0; i < dynamic.length; i++) {
-            processEntity(dynamic[i], camPos, Dh, nowMs, selectedId, hoveredId, labelsCollection, true);
+            processEntity(dynamic[i], camPos, Dh, nowMs, selectedId, hoveredId, labelsCollection, true, i);
         }
 
         // Pass 2: Static entities — cull frames only (unless interactive)
         if (isStaticCullFrame) {
             for (let i = 0; i < staticBatch.length; i++) {
-                processEntity(staticBatch[i], camPos, Dh, nowMs, selectedId, hoveredId, labelsCollection, false);
+                processEntity(staticBatch[i], camPos, Dh, nowMs, selectedId, hoveredId, labelsCollection, false, i);
             }
         } else {
             for (let i = 0; i < staticBatch.length; i++) {
                 const id = staticBatch[i].entity.id;
                 if (id === selectedId || id === hoveredId) {
-                    processEntity(staticBatch[i], camPos, Dh, nowMs, selectedId, hoveredId, labelsCollection, false);
+                    processEntity(staticBatch[i], camPos, Dh, nowMs, selectedId, hoveredId, labelsCollection, false, i);
                 }
             }
         }
@@ -96,24 +97,14 @@ export function createUpdateLoop(
 /** Process a single entity (shared by both dynamic and static passes). */
 function processEntity(
     item: AnimatableItem, camPos: Cartesian3, Dh: number, nowMs: number,
-    selectedId: string | null, hoveredId: string | null, labelsCollection: any, isDynamic: boolean
+    selectedId: string | null, hoveredId: string | null, labelsCollection: any, isDynamic: boolean,
+    entityIndex: number
 ): void {
     const { primitive, entity, posRef } = item;
     if (!primitive || primitive.isDestroyed?.()) return;
 
     const isSelected = selectedId === entity.id;
     const isHovered = hoveredId === entity.id;
-
-    // Horizon culling
-    const posDistSqr = Cartesian3.magnitudeSquared(posRef);
-    const Dph = Math.sqrt(Math.max(0, posDistSqr - R2));
-    const distSqr = Cartesian3.distanceSquared(camPos, posRef);
-    const horizonLimit = Dh + Dph;
-    if (distSqr > horizonLimit * horizonLimit && !isSelected && !isHovered) {
-        if (primitive.show !== false) primitive.show = false;
-        hideLabel(item, labelsCollection);
-        return;
-    }
 
     if (isDynamic && entity.timestamp && entity.heading !== undefined) {
         extrapolatePosition(item, nowMs);
@@ -132,9 +123,8 @@ function processEntity(
         else if (!isSelected && !isHovered && primitive.silhouetteSize !== 0) primitive.silhouetteSize = 0;
     }
 
-    // Label visibility
-    const distanceToPoint = Math.sqrt(distSqr);
-    const showLabel = distanceToPoint < 500000 || isSelected || isHovered;
+    // Label visibility naturally triggers ONLY on hover or select to bypass text buffer lag
+    const showLabel = isSelected || isHovered;
     if (showLabel) {
         if (!item.labelPrimitive && labelsCollection) createLabel(item, labelsCollection);
         if (item.labelPrimitive && !item.labelPrimitive.isDestroyed?.()) {
@@ -147,9 +137,10 @@ function processEntity(
     }
 }
 
-/** Hide + remove label to free memory. */
+/** Hide label to save render time, but do NOT remove it. Creating/Removing labels triggers massive WebGL buffer rewrites. */
 function hideLabel(item: AnimatableItem, labelsCollection: any): void {
     if (!item.labelPrimitive || item.labelPrimitive.isDestroyed?.()) return;
     if (item.labelPrimitive.show !== false) item.labelPrimitive.show = false;
-    if (labelsCollection) removeLabel(item, labelsCollection);
+    // We intentionally do NOT call removeLabel here. Let Cesium use the 'show' boolean 
+    // to skip rendering, which is O(1). 
 }

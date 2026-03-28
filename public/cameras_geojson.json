@@ -8212,31 +8212,6 @@
       "geometry": {
         "type": "Point",
         "coordinates": [
-          -80.19366,
-          25.77427
-        ]
-      },
-      "properties": {
-        "stream": "http://75.144.124.21:1024/mjpg/video.mjpg",
-        "country": "United States",
-        "country_code": null,
-        "region": "Florida",
-        "city": "Miami",
-        "timezone": "-04:00",
-        "preview_url": "http://insecam.org/static/thumb/241628.jpg",
-        "is_iframe": false,
-        "is_static": false,
-        "is_popular": false,
-        "categories": [
-          "other"
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "geometry": {
-        "type": "Point",
-        "coordinates": [
           -80.13005,
           25.79065
         ]

@@ -31,5 +31,11 @@
   "author": "WorldWideView",
   "peerDependencies": {
     "@worldwideview/wwv-plugin-sdk": "*"
+  },
+  "worldwideview": {
+    "id": "military-bases",
+    "icon": "Swords",
+    "category": "Military",
+    "format": "static"
   }
 }

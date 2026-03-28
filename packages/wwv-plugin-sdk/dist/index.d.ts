@@ -1,4 +1,5 @@
 import type { ComponentType } from "react";
+export declare function createSvgIconUrl(Icon: ComponentType<any>, props?: any): string;
 export type { PluginManifest, PluginFormat, PluginType, TrustTier, PluginCapability, DataSourceConfig, FieldMapping, RenderingConfig } from "./manifest";
 export type PluginCategory = "aviation" | "maritime" | "conflict" | "natural-disaster" | "infrastructure" | "cyber" | "economic" | "custom";
 export interface TimeRange {
@@ -40,6 +41,7 @@ export interface CesiumEntityOptions {
         near: number;
         far: number;
     };
+    disableDepthTestDistance?: number;
     modelUrl?: string;
     modelScale?: number;
     modelMinPixelSize?: number;
@@ -122,6 +124,12 @@ export interface WorldPlugin {
     getSelectionBehavior?(entity: GeoEntity): SelectionBehavior | null;
     getServerConfig?(): ServerPluginConfig;
     getFilterDefinitions?(): FilterDefinition[];
+    getLegend?(): {
+        label: string;
+        color: string;
+        filterId?: string;
+        filterValue?: string;
+    }[];
     getSidebarComponent?(): ComponentType;
     getDetailComponent?(): ComponentType<{
         entity: GeoEntity;

@@ -1,8 +1,10 @@
 import { useEffect, useRef } from "react";
 import type { Viewer as CesiumViewer } from "cesium";
+import { Cartographic } from "cesium";
 import type { GeoEntity, CesiumEntityOptions } from "@/core/plugins/PluginTypes";
 import { renderEntities, AnimatableItem } from "../EntityRenderer";
 import { createUpdateLoop } from "../AnimationLoop";
+import { rebuildStacks, calculateGridSizeDegrees } from "../StackManager";
 
 
 export function useEntityRendering(
@@ -89,12 +91,42 @@ export function useEntityRendering(
         // Rebuild cached array after render
         cachedAnimatablesRef.current.current = Array.from(animatablesMapRef.current.values());
 
+        // Camera distance-based dynamic clustering
+        let clusteringDebounce: ReturnType<typeof setTimeout>;
+        let lastAltitude = 0;
+        if (viewer.camera && viewer.camera.positionCartographic) lastAltitude = viewer.camera.positionCartographic.height;
+        
+        const handleCameraChange = () => {
+            if (viewer.isDestroyed()) return;
+            let altitude = 1000000;
+            if (viewer.camera && viewer.camera.positionCartographic) {
+                altitude = viewer.camera.positionCartographic.height;
+            } else if (viewer.camera && viewer.camera.position) {
+                const carto = Cartographic.fromCartesian(viewer.camera.position);
+                if (carto) altitude = carto.height;
+            }
+
+            // Re-cluster if altitude changed significantly (5%)
+            if (Math.abs(altitude - lastAltitude) / Math.max(lastAltitude, 1) > 0.05) {
+                lastAltitude = altitude;
+                clearTimeout(clusteringDebounce);
+                clusteringDebounce = setTimeout(() => {
+                    if (viewer.isDestroyed()) return;
+                    rebuildStacks(animatablesMapRef.current, calculateGridSizeDegrees(altitude));
+                    viewer.scene.requestRender();
+                }, 100);
+            }
+        };
+        viewer.camera.changed.addEventListener(handleCameraChange);
+
         // Signal Cesium that the scene needs a re-render (requestRenderMode is on)
         viewer.scene.requestRender();
 
         return () => {
+            clearTimeout(clusteringDebounce);
             if (!viewer.isDestroyed()) {
                 viewer.scene.preUpdate.removeEventListener(updatePositions);
+                viewer.camera.changed.removeEventListener(handleCameraChange);
                 // Synchronously flush all labels to prevent stale labels persisting
                 const labels = (viewer as any)?._wwvLabels;
                 if (labels) {

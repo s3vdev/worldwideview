@@ -1,5 +1,5 @@
 import {
-    Cartesian3, Color, Ellipsoid,
+    Cartesian3, Cartographic, Color, Ellipsoid,
     PointPrimitiveCollection, BillboardCollection, LabelCollection,
     VerticalOrigin, DistanceDisplayCondition, NearFarScalar,
 } from "cesium";
@@ -11,6 +11,7 @@ import {
     markAnimatablesDirty, getStableAnimatables,
 } from "./renderCaches";
 import { updateExistingItem, createNewItem, cleanupRemovedEntities } from "./primitiveOps";
+import { rebuildStacks, calculateGridSizeDegrees } from "./StackManager";
 
 // Re-export for existing consumers
 export { getEntityColor, getCachedColor, markAnimatablesDirty, getStableAnimatables } from "./renderCaches";
@@ -30,6 +31,9 @@ export interface AnimatableItem {
     _modelPromoted?: boolean;
 }
 
+/** Global render kickstarter for deeply nested async operations. */
+export let globalRequestRender: () => void = () => {};
+
 /** Initialize primitive collections on the viewer. */
 export function initPrimitiveCollections(viewer: CesiumViewer): void {
     if (!viewer?.scene?.primitives) {
@@ -41,6 +45,12 @@ export function initPrimitiveCollections(viewer: CesiumViewer): void {
     billboards.blendOption = 2; // TRANSLUCENT
     (viewer as any)._wwvBillboards = viewer.scene.primitives.add(billboards);
     (viewer as any)._wwvLabels = viewer.scene.primitives.add(new LabelCollection());
+
+    globalRequestRender = () => {
+        if (viewer && !viewer.isDestroyed()) {
+            viewer.scene.requestRender();
+        }
+    };
 }
 
 /** Get typed references to the primitive collections. */
@@ -120,6 +130,16 @@ export async function renderEntitiesChunked(
     });
     cleanupRemovedEntities(existingMap, currentIds, points, billboards, labels);
     markAnimatablesDirty();
+
+    let altitude = 1000000;
+    if (viewer.camera && viewer.camera.positionCartographic) {
+        altitude = viewer.camera.positionCartographic.height;
+    } else if (viewer.camera && viewer.camera.position) {
+        const carto = Cartographic.fromCartesian(viewer.camera.position);
+        if (carto) altitude = carto.height;
+    }
+    
+    rebuildStacks(existingMap, calculateGridSizeDegrees(altitude));
     return getStableAnimatables(existingMap);
 }
 
@@ -136,5 +156,15 @@ export function renderEntities(
     for (const item of visibleEntities) renderSingleEntity(item, existingMap, points, billboards, labels, currentIds);
     cleanupRemovedEntities(existingMap, currentIds, points, billboards, labels);
     markAnimatablesDirty();
+
+    let altitude = 1000000;
+    if (viewer.camera && viewer.camera.positionCartographic) {
+        altitude = viewer.camera.positionCartographic.height;
+    } else if (viewer.camera && viewer.camera.position) {
+        const carto = Cartographic.fromCartesian(viewer.camera.position);
+        if (carto) altitude = carto.height;
+    }
+
+    rebuildStacks(existingMap, calculateGridSizeDegrees(altitude));
     return getStableAnimatables(existingMap);
 }

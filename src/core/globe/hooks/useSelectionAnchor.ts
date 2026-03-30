@@ -20,6 +20,7 @@ export function useSelectionAnchor(
     viewer: CesiumViewer | null,
     isReady: boolean,
     selectedEntity: any,
+    lockedEntityId: string | null,
     selectionEntityRef: React.MutableRefObject<CesiumEntity | null>,
     animatablesMapRef: React.MutableRefObject<Map<string, AnimatableItem>>
 ) {
@@ -37,7 +38,6 @@ export function useSelectionAnchor(
 
             entity = viewer.entities.add({
                 id: "__wwv_selection_anchor",
-                show: false,
                 point: {
                     pixelSize: 0,
                 },
@@ -45,6 +45,7 @@ export function useSelectionAnchor(
                     image: SELECTION_BOX_SVG,
                     width: 56,
                     height: 56,
+                    show: false,
                     disableDepthTestDistance: Number.POSITIVE_INFINITY, // Always rendered on top
                 } as any
             });
@@ -70,12 +71,12 @@ export function useSelectionAnchor(
         const selectionEntity = selectionEntityRef.current;
         if (!selectionEntity) return;
 
-        if (!selectedEntity) {
-            selectionEntity.show = false;
-            return;
+        if (selectionEntity.billboard) {
+            selectionEntity.billboard.show = (!!selectedEntity && lockedEntityId !== selectedEntity.id) as any;
         }
 
-        selectionEntity.show = true;
+        if (!selectedEntity) return;
+
         const entityId = selectedEntity.id;
 
         // Use a CallbackProperty so viewer.trackedEntity follows the
@@ -90,5 +91,5 @@ export function useSelectionAnchor(
             const item = animatablesMapRef.current?.get(entityId);
             return item ? item.posRef : fallbackPos;
         }, false) as any;
-    }, [selectedEntity, selectionEntityRef, animatablesMapRef]);
+    }, [selectedEntity, lockedEntityId, selectionEntityRef, animatablesMapRef]);
 }

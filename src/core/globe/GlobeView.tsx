@@ -105,7 +105,7 @@ export default function GlobeView() {
     useBorders(viewerRef.current, showLabels, isGoogle3D);
 
     // UI/Interaction Hooks
-    useSelectionAnchor(viewerRef.current, viewerReady, selectedEntity, selectionEntityRef, animatablesMapRef);
+    useSelectionAnchor(viewerRef.current, viewerReady, selectedEntity, lockedEntityId, selectionEntityRef, animatablesMapRef);
     useCameraSync(viewerRef.current, viewerReady, setCameraPosition, setFps);
     useCameraActions(viewerRef.current, viewerReady);
     // All entities go through billboard/point pipeline (including model-type as fallback)

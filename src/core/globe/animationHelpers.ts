@@ -25,6 +25,12 @@ const scratchVelocity = new Cartesian3();
 const scratchNorthPole = new Cartesian3(0, 0, 1);
 const scratchSurfaceNormal = new Cartesian3();
 
+const SELECTED_SCALE_FACTOR = 1.35;
+const HOVER_SCALE_FACTOR = 1.25;
+
+/** Overall background opacity for unclustered entities when a spiderifier is open */
+export const FADED_OPACITY = 0.4;
+
 /** Extrapolate entity position forward/backward in time (zero-allocation). */
 export function extrapolatePosition(item: AnimatableItem, nowMs: number): void {
     const { entity, posRef } = item;
@@ -70,20 +76,23 @@ export function extrapolatePosition(item: AnimatableItem, nowMs: number): void {
 }
 
 /** Apply selected/hovered/normal highlight styling. */
-export function applyHighlight(item: AnimatableItem, isSelected: boolean, isHovered: boolean): void {
+export function applyHighlight(item: AnimatableItem, isSelected: boolean, isHovered: boolean, isFaded: boolean = false): void {
     const { primitive, options } = item;
 
-    let targetState: 'selected' | 'hovered' | 'normal' = 'normal';
+    let targetState: 'selected' | 'hovered' | 'normal' | 'faded' = 'normal';
     if (isSelected) targetState = 'selected';
     else if (isHovered) targetState = 'hovered';
+    else if (isFaded) targetState = 'faded';
 
     if (item.lastHighlightState === targetState) return;
-    item.lastHighlightState = targetState;
+    item.lastHighlightState = targetState as any;
+
+    const baseScale = options.iconScale ?? 0.7;
 
     if (targetState === 'selected') {
         primitive.color = HIGHLIGHT_COLOR_SELECTED;
         if (options.type === "billboard") {
-            primitive.scale = 0.7;
+            primitive.scale = baseScale * 1.4;
         } else {
             primitive.pixelSize = (options.size || defaultPointSize()) * 2.0;
             primitive.outlineColor = HIGHLIGHT_COLOR_SELECTED;
@@ -92,16 +101,26 @@ export function applyHighlight(item: AnimatableItem, isSelected: boolean, isHove
     } else if (targetState === 'hovered') {
         primitive.color = HIGHLIGHT_COLOR_HOVERED;
         if (options.type === "billboard") {
-            primitive.scale = 0.6;
+            primitive.scale = baseScale * 1.2;
         } else {
             primitive.pixelSize = (options.size || defaultPointSize()) * 1.5;
             primitive.outlineColor = HIGHLIGHT_COLOR_HOVERED;
             primitive.outlineWidth = 2;
         }
+    } else if (targetState === 'faded') {
+        // Drop alpha to defined faded opacity for an ethereal fade
+        primitive.color = item.baseColor ? item.baseColor.withAlpha(FADED_OPACITY * item.baseColor.alpha) : undefined;
+        if (options.type === "billboard") {
+            primitive.scale = baseScale;
+        } else {
+            primitive.pixelSize = options.size || defaultPointSize();
+            primitive.outlineColor = item.baseOutlineColor ? item.baseOutlineColor.withAlpha(FADED_OPACITY * item.baseOutlineColor.alpha) : undefined;
+            primitive.outlineWidth = options.outlineWidth || 1;
+        }
     } else {
         primitive.color = item.baseColor;
         if (options.type === "billboard") {
-            primitive.scale = 0.5;
+            primitive.scale = baseScale;
         } else {
             primitive.pixelSize = options.size || defaultPointSize();
             primitive.outlineColor = item.baseOutlineColor;

@@ -101,7 +101,7 @@ export function EntityInfoCard() {
                     <div className="entity-info-card__prop">
                         <span className="entity-info-card__prop-key">Timestamp</span>
                         <span className="entity-info-card__prop-value">
-                            {new Date(hoveredEntity.timestamp).toLocaleTimeString()}
+                            {new Date(hoveredEntity.timestamp).toLocaleString()}
                         </span>
                     </div>
                 )}

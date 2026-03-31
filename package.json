@@ -10,7 +10,9 @@
     "copy-cesium": "node scripts/copy-cesium.mjs",
     "build": "next build --webpack",
     "start": "next start",
-    "test": "vitest run"
+    "test": "vitest run",
+    "start:backends": "pnpm --filter \"*-backend\" --parallel start",
+    "clean:backends": "pnpm --filter \"*-backend\" --parallel clean:db"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
@@ -24,6 +26,7 @@
     "@worldwideview/wwv-plugin-maritime": "*",
     "@worldwideview/wwv-plugin-military-aviation": "*",
     "@worldwideview/wwv-plugin-satellite": "*",
+    "@worldwideview/wwv-plugin-iranwarlive": "workspace:*",
     "@worldwideview/wwv-plugin-sdk": "*",
     "@worldwideview/wwv-plugin-wildfire": "*",
     "bcryptjs": "^3.0.3",

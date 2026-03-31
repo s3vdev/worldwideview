@@ -1,7 +1,7 @@
 import {
     Cartesian3, Cartographic, Color, Ellipsoid,
     PointPrimitiveCollection, BillboardCollection, LabelCollection,
-    VerticalOrigin, DistanceDisplayCondition, NearFarScalar,
+    VerticalOrigin, DistanceDisplayCondition, NearFarScalar, HeightReference,
 } from "cesium";
 import type { Viewer as CesiumViewer } from "cesium";
 import type { GeoEntity, CesiumEntityOptions } from "@/core/plugins/PluginTypes";
@@ -29,10 +29,12 @@ export interface AnimatableItem {
     lastHighlightState?: 'normal' | 'hovered' | 'selected';
     /** Set by LOD hook — when true, billboard is hidden because a 3D model replaced it */
     _modelPromoted?: boolean;
+    /** Set by AnimationLoop - true if hidden by mathematical horizon culling */
+    _occluded?: boolean;
 }
 
 /** Global render kickstarter for deeply nested async operations. */
-export let globalRequestRender: () => void = () => {};
+export let globalRequestRender: () => void = () => { };
 
 /** Initialize primitive collections on the viewer. */
 export function initPrimitiveCollections(viewer: CesiumViewer): void {
@@ -41,10 +43,10 @@ export function initPrimitiveCollections(viewer: CesiumViewer): void {
         return;
     }
     (viewer as any)._wwvPoints = viewer.scene.primitives.add(new PointPrimitiveCollection());
-    const billboards = new BillboardCollection();
+    const billboards = new BillboardCollection({ scene: viewer.scene });
     billboards.blendOption = 2; // TRANSLUCENT
     (viewer as any)._wwvBillboards = viewer.scene.primitives.add(billboards);
-    (viewer as any)._wwvLabels = viewer.scene.primitives.add(new LabelCollection());
+    (viewer as any)._wwvLabels = viewer.scene.primitives.add(new LabelCollection({ scene: viewer.scene }));
 
     globalRequestRender = () => {
         if (viewer && !viewer.isDestroyed()) {
@@ -73,6 +75,8 @@ export function createLabel(item: AnimatableItem, labels: LabelCollection): void
         fillColor: Color.WHITE, outlineColor: Color.BLACK, outlineWidth: 2,
         verticalOrigin: VerticalOrigin.BOTTOM, pixelOffset: { x: 0, y: -12 } as any,
         show: true, id: clickId,
+        // WARNING: Do NOT use heightReference: HeightReference.CLAMP_TO_GROUND here.
+        // It causes severe lag/performance drops with thousands of dynamic entities.
         disableDepthTestDistance: item.options.disableDepthTestDistance ?? Number.POSITIVE_INFINITY,
         translucencyByDistance: new NearFarScalar(1e3, 1.0, 5e5, 0.0),
         distanceDisplayCondition: item.options.distanceDisplayCondition
@@ -138,8 +142,8 @@ export async function renderEntitiesChunked(
         const carto = Cartographic.fromCartesian(viewer.camera.position);
         if (carto) altitude = carto.height;
     }
-    
-    rebuildStacks(existingMap, calculateGridSizeDegrees(altitude));
+
+    rebuildStacks(existingMap, calculateGridSizeDegrees(altitude), true);
     return getStableAnimatables(existingMap);
 }
 
@@ -165,6 +169,6 @@ export function renderEntities(
         if (carto) altitude = carto.height;
     }
 
-    rebuildStacks(existingMap, calculateGridSizeDegrees(altitude));
+    rebuildStacks(existingMap, calculateGridSizeDegrees(altitude), true);
     return getStableAnimatables(existingMap);
 }

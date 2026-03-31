@@ -1,8 +1,10 @@
-import { Cartesian3, Color } from "cesium";
+import { Cartesian3, Color, Ellipsoid } from "cesium";
 import type { Viewer as CesiumViewer } from "cesium";
 import { useStore } from "@/core/state/store";
 import { createLabel, removeLabel, type AnimatableItem } from "./EntityRenderer";
+import { tickStackAnimation } from "./stackAnimation";
 import { updateModelTransform } from "./ModelManager";
+import { isAnyStackExpanded, isEntityInExpandedStack, getEntityTargetPosition } from "./StackManager";
 import {
     HIGHLIGHT_COLOR_SELECTED,
     extrapolatePosition,
@@ -51,14 +53,29 @@ export function createUpdateLoop(
     hoveredEntityIdRef: React.MutableRefObject<string | null>
 ): () => void {
     let frameCount = 0;
+    let prevSelectedId: string | null = null;
+    let prevHoveredId: string | null = null;
+    let prevAnyExpanded = false;
 
     return () => {
         if (!viewer || viewer.isDestroyed()) return;
         const animatables = animatablesRef.current;
-        if (animatables.length === 0) return;
-
         const labelsCollection = (viewer as any)._wwvLabels;
         const state = useStore.getState();
+
+        // Always run stack animation tick so that ghost hubs can be cleaned up
+        // even if the user toggles all layers off!
+        const billboards = (viewer as any)._wwvBillboards;
+        let isAnimatingStack = false;
+        if (billboards) {
+            isAnimatingStack = tickStackAnimation(labelsCollection, billboards);
+        }
+
+        if (animatables.length === 0) {
+            if (isAnimatingStack || state.isPlaybackMode) viewer.scene.requestRender();
+            return;
+        }
+
         const nowMs = state.isPlaybackMode ? state.currentTime.getTime() : Date.now();
         const camPos = viewer.camera.positionWC;
         const camDistSqr = Cartesian3.magnitudeSquared(camPos);
@@ -70,26 +87,43 @@ export function createUpdateLoop(
         const isStaticCullFrame = frame % STATIC_HORIZON_INTERVAL === 0;
         const selectedId = state.selectedEntity?.id ?? null;
         const hoveredId = hoveredEntityIdRef.current;
+        const anyExpanded = isAnyStackExpanded();
+
+        let forceFullPass = false;
+        if (anyExpanded !== prevAnyExpanded) {
+            forceFullPass = true;
+            prevAnyExpanded = anyExpanded;
+        }
 
         const { dynamic, staticBatch } = ensureBuckets(animatables);
 
         // Pass 1: Dynamic entities — every frame
         for (let i = 0; i < dynamic.length; i++) {
-            processEntity(dynamic[i], camPos, Dh, nowMs, selectedId, hoveredId, labelsCollection, true, i);
+            const isFaded = anyExpanded && !isEntityInExpandedStack(dynamic[i].entity.id);
+            processEntity(dynamic[i], camPos, Dh, nowMs, selectedId, hoveredId, labelsCollection, true, i, isFaded);
         }
 
         // Pass 2: Static entities — cull frames only (unless interactive)
-        if (isStaticCullFrame) {
+        if (isStaticCullFrame || forceFullPass) {
             for (let i = 0; i < staticBatch.length; i++) {
-                processEntity(staticBatch[i], camPos, Dh, nowMs, selectedId, hoveredId, labelsCollection, false, i);
+                const isFaded = anyExpanded && !isEntityInExpandedStack(staticBatch[i].entity.id);
+                processEntity(staticBatch[i], camPos, Dh, nowMs, selectedId, hoveredId, labelsCollection, false, i, isFaded);
             }
         } else {
             for (let i = 0; i < staticBatch.length; i++) {
                 const id = staticBatch[i].entity.id;
-                if (id === selectedId || id === hoveredId) {
-                    processEntity(staticBatch[i], camPos, Dh, nowMs, selectedId, hoveredId, labelsCollection, false, i);
+                if (id === selectedId || id === hoveredId || id === prevSelectedId || id === prevHoveredId) {
+                    const isFaded = anyExpanded && !isEntityInExpandedStack(id);
+                    processEntity(staticBatch[i], camPos, Dh, nowMs, selectedId, hoveredId, labelsCollection, false, i, isFaded);
                 }
             }
+        }
+
+        prevSelectedId = selectedId;
+        prevHoveredId = hoveredId;
+
+        if (isAnimatingStack || dynamic.length > 0 || state.isPlaybackMode) {
+            viewer.scene.requestRender();
         }
     };
 }
@@ -98,7 +132,7 @@ export function createUpdateLoop(
 function processEntity(
     item: AnimatableItem, camPos: Cartesian3, Dh: number, nowMs: number,
     selectedId: string | null, hoveredId: string | null, labelsCollection: any, isDynamic: boolean,
-    entityIndex: number
+    entityIndex: number, isFaded: boolean
 ): void {
     const { primitive, entity, posRef } = item;
     if (!primitive || primitive.isDestroyed?.()) return;
@@ -112,11 +146,29 @@ function processEntity(
     }
 
     if (item._modelPromoted) return;
+
+    // Mathematical horizon culling (extremely fast, precise for sphere)
+    item._occluded = Cartesian3.dot(posRef, camPos) <= R2;
+    if (item._occluded) {
+        if (primitive.show !== false) primitive.show = false;
+        hideLabel(item, labelsCollection);
+        return;
+    }
+
+    // Force rendering pos to hub if clustered, so pixelOffset originates from the hub
+    const targetPos = getEntityTargetPosition(entity.id) ?? posRef;
+    if (primitive.position && !Cartesian3.equals(primitive.position, targetPos)) {
+        primitive.position = targetPos;
+        if (item.labelPrimitive && !item.labelPrimitive.isDestroyed?.()) {
+            item.labelPrimitive.position = targetPos;
+        }
+    }
+
     if (primitive.show !== true) primitive.show = true;
 
     // Highlight styling
     if (item.options.type !== "model") {
-        applyHighlight(item, isSelected, isHovered);
+        applyHighlight(item, isSelected, isHovered, isFaded);
     } else {
         if (isSelected && primitive.silhouetteSize !== 2) primitive.silhouetteSize = 2;
         else if (isHovered && primitive.silhouetteSize !== 1) primitive.silhouetteSize = 1;

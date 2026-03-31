@@ -18,8 +18,11 @@ const cache = new Map<string, string>();
 /** In-flight promises to deduplicate concurrent requests for the same URL. */
 const pending = new Map<string, Promise<string>>();
 
-/** Logical size of the output canvas in CSS pixels. */
-const BASE_SIZE = 64;
+/** Returns the logical size of the output canvas in CSS pixels. Mobile keeps 64px, PC gets smaller 48px. */
+function getBaseSize(): number {
+    if (typeof window === "undefined") return 64;
+    return window.innerWidth <= 768 ? 64 : 48;
+}
 
 /** Padding ratio — the icon fills (1 - 2*INSET) of the canvas. */
 const ICON_INSET = 0.12;
@@ -45,7 +48,8 @@ function drainQueue(): void {
  * Results are cached; duplicate in-flight requests share one promise.
  */
 export function getHiResIcon(srcUrl: string, bgColor = DEFAULT_BG): Promise<string> {
-    const key = `${srcUrl}::${bgColor}`;
+    const baseSize = getBaseSize();
+    const key = `${srcUrl}::${bgColor}::${baseSize}`;
 
     const hit = cache.get(key);
     if (hit) return Promise.resolve(hit);
@@ -60,7 +64,7 @@ export function getHiResIcon(srcUrl: string, bgColor = DEFAULT_BG): Promise<stri
 
             img.onload = () => {
                 const dpr = typeof window !== "undefined" ? window.devicePixelRatio : 1;
-                const pxSize = Math.round(BASE_SIZE * dpr);
+                const pxSize = Math.round(baseSize * dpr);
 
                 const canvas = document.createElement("canvas");
                 canvas.width = pxSize;
@@ -108,5 +112,6 @@ export function getHiResIcon(srcUrl: string, bgColor = DEFAULT_BG): Promise<stri
 
 /** Synchronous cache lookup — returns the hi-res URL if already cached. */
 export function getHiResIconSync(srcUrl: string): string | undefined {
-    return cache.get(`${srcUrl}::${DEFAULT_BG}`);
+    const baseSize = getBaseSize();
+    return cache.get(`${srcUrl}::${DEFAULT_BG}::${baseSize}`);
 }

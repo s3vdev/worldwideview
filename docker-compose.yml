@@ -13,5 +13,14 @@ services:
       - WWV_DEMO_ADMIN_SECRET=${WWV_DEMO_ADMIN_SECRET:-}
       - WWV_BRIDGE_TOKEN=${WWV_BRIDGE_TOKEN:-}
 
+  iranwarlive-backend:
+    build: ./packages/wwv-plugin-iranwarlive/backend
+    ports:
+      - "3001:3001"
+    volumes:
+      - iranwarlive-data:/app/data
+    restart: always
+
 volumes:
   wwv-data:
+  iranwarlive-data:

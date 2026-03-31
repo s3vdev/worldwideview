@@ -5,12 +5,13 @@
  * pixelOffset towards the target (expand) or back to zero (collapse).
  * Uses a dedicated persistent Billboard per stack for the textual hub badge.
  */
-import { Cartesian2, Cartesian3, HorizontalOrigin, VerticalOrigin, NearFarScalar } from "cesium";
+import { Cartesian2, Cartesian3, HorizontalOrigin, VerticalOrigin, NearFarScalar, HeightReference, Color } from "cesium";
 import type { LabelCollection, BillboardCollection } from "cesium";
 import {
-    getStacks, getSpiderOffset,
+    getStacks, getSpiderOffset, isAnyStackExpanded,
     type EntityStack,
 } from "./StackManager";
+import { FADED_OPACITY } from "./animationHelpers";
 
 /** Scale hub icons down when zooming out. */
 const hubScaleByDistance = new NearFarScalar(2.0e6, 1.0, 1.5e7, 0.5);
@@ -48,7 +49,7 @@ export function tickStackAnimation(labels: LabelCollection | null, billboards: B
     const now = Date.now();
     const activeStacks = getStacks();
     let needsRender = false;
-    
+
     // 1. Garbage Collect abandoned hub billboards
     for (const [stackId, bb] of hubBillboards.entries()) {
         if (!activeStacks.has(stackId)) {
@@ -118,7 +119,8 @@ function tickSingle(stack: EntityStack, now: number, billboards: BillboardCollec
         if (isClosed && t >= 1) {
             if (prim.show) prim.show = false;
         } else if (isOpen || state === "collapsing") {
-            if (!prim.show) prim.show = true;
+            const shouldShow = !item._occluded;
+            if (prim.show !== shouldShow) prim.show = shouldShow;
         }
     }
 
@@ -136,16 +138,26 @@ function manageDedicatedHub(stack: EntityStack, billboards: BillboardCollection)
     const cssColor = stack.hubItem.baseColor?.toCssColorString() ?? "#ffffff";
     const expectedImage = getClusterIcon(count, cssColor);
 
+    const anyExpanded = isAnyStackExpanded();
+    const isExpanded = stack.state === "expanded" || stack.state === "expanding";
+    const isFaded = anyExpanded && !isExpanded;
+    // Set opacity for unexpanded hubs when a spiderifier is active
+    const targetColor = isFaded ? new Color(1.0, 1.0, 1.0, FADED_OPACITY) : Color.WHITE;
+    const isVisible = !stack.hubItem._occluded;
+
     if (!bb || bb.isDestroyed?.()) {
         bb = billboards.add({
             position: stack.hubItem.posRef,
             image: expectedImage,
+            color: targetColor,
             horizontalOrigin: HorizontalOrigin.CENTER,
             verticalOrigin: VerticalOrigin.CENTER,
-            disableDepthTestDistance: 500_000,
             pixelOffset: new Cartesian2(0, 0),
             scaleByDistance: hubScaleByDistance,
-            show: true,
+            show: isVisible,
+            // WARNING: Do NOT use heightReference: HeightReference.CLAMP_TO_GROUND here.
+            // It causes severe lag/performance drops with thousands of dynamic entities.
+            disableDepthTestDistance: stack.hubItem.options.disableDepthTestDistance ?? Number.POSITIVE_INFINITY,
             // Tag with same ID as top entity! So clicking it triggers interaction/selection.
             id: { _wwvEntity: stack.hubItem.entity }
         });
@@ -156,8 +168,9 @@ function manageDedicatedHub(stack: EntityStack, billboards: BillboardCollection)
             bb.position = stack.hubItem.posRef;
         }
         if (bb.image !== expectedImage) bb.image = expectedImage;
+        if (!Color.equals(bb.color, targetColor)) bb.color = targetColor;
         // Always ensure it's shown, it persists even when expanded!
-        if (!bb.show) bb.show = true;
+        if (bb.show !== isVisible) bb.show = isVisible;
     }
 }
 

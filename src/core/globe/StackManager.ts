@@ -44,6 +44,13 @@ export interface SpiderOffset {
 // ── Module state ────────────────────────────────────────────
 const stacks = new Map<string, EntityStack>();
 const spiderOffsets = new Map<string, SpiderOffset>();
+/** Tracks which stack each entity belongs to for ungrouping detection. */
+const entityStackMembership = new Map<string, string>();
+/** Last grid size that produced a successful grouping. */
+let lastAppliedGridSize = 0;
+/** Minimum interval (ms) between rebuilds to prevent rapid re-clustering. */
+const REBUILD_COOLDOWN_MS = 300;
+let lastRebuildMs = 0;
 
 export function getStacks(): ReadonlyMap<string, EntityStack> { return stacks; }
 export function getSpiderOffset(entityId: string): SpiderOffset | undefined { return spiderOffsets.get(entityId); }
@@ -61,20 +68,60 @@ function coordKey(pluginId: string, lat: number, lon: number, gridSizeDegrees: n
     return `${pluginId}_${gridLat.toFixed(4)},${gridLon.toFixed(4)}`;
 }
 
-// ── Rebuild stacks after a render cycle or camera move ────────
-export function rebuildStacks(existingMap: Map<string, AnimatableItem>, gridSizeDegrees: number = 0.01): void {
-    // Group by coordinate key per plugin
+/** Compute candidate grouping without mutating state. */
+function computeGroups(existingMap: Map<string, AnimatableItem>, gridSize: number): Map<string, AnimatableItem[]> {
     const groups = new Map<string, AnimatableItem[]>();
     for (const item of existingMap.values()) {
-        const key = coordKey(item.entity.pluginId, item.entity.latitude, item.entity.longitude, gridSizeDegrees);
+        const key = coordKey(item.entity.pluginId, item.entity.latitude, item.entity.longitude, gridSize);
         let list = groups.get(key);
         if (!list) { list = []; groups.set(key, list); }
         list.push(item);
     }
+    return groups;
+}
 
-    // Remove stacks that no longer exist
+/** Count how many entities are in groups of 2+. */
+function countGroupedEntities(groups: Map<string, AnimatableItem[]>): number {
+    let count = 0;
+    for (const items of groups.values()) {
+        if (items.length >= 2) count += items.length;
+    }
+    return count;
+}
+
+// ── Rebuild stacks after a render cycle or camera move ────────
+export function rebuildStacks(existingMap: Map<string, AnimatableItem>, gridSizeDegrees: number = 0.01, force = false): void {
+    const now = Date.now();
+
+    // Cooldown: skip rebuilds that come too fast (unless forced, e.g. data change)
+    if (!force && now - lastRebuildMs < REBUILD_COOLDOWN_MS) return;
+
+    // Compute candidate grouping at the new grid size
+    const candidateGroups = computeGroups(existingMap, gridSizeDegrees);
+    const candidateGrouped = countGroupedEntities(candidateGroups);
+
+    // Sticky guard: only block ungrouping when the grid size barely changed
+    // (jitter at the same zoom level). A real zoom (>20% grid change) always applies.
+    if (stacks.size > 0 && lastAppliedGridSize > 0 && !force) {
+        const gridRatio = Math.abs(gridSizeDegrees - lastAppliedGridSize) / lastAppliedGridSize;
+        if (gridRatio < 0.2) {
+            const currentGrouped = countGroupedEntities(computeGroups(existingMap, lastAppliedGridSize));
+            if (candidateGrouped < currentGrouped) return;
+        }
+    }
+
+    lastRebuildMs = now;
+    lastAppliedGridSize = gridSizeDegrees;
+    applyGroups(candidateGroups);
+}
+
+/** Apply a computed grouping to the live stacks (mutates module state). */
+function applyGroups(groups: Map<string, AnimatableItem[]>): void {
+    // Remove stacks whose key no longer has 2+ items
     for (const key of stacks.keys()) {
         if (!groups.has(key) || (groups.get(key)!.length < 2)) {
+            const stack = stacks.get(key)!;
+            for (const child of stack.children) entityStackMembership.delete(child.entity.id);
             stacks.delete(key);
         }
     }
@@ -86,13 +133,13 @@ export function rebuildStacks(existingMap: Map<string, AnimatableItem>, gridSize
         if (existing) {
             existing.hubItem = items[0];
             existing.children = items;
-            
+
             // Force collapse if cluster survived rebuild but needs resizing/re-grouping
             if (existing.state === "expanded" || existing.state === "expanding") {
                 existing.state = "collapsing";
                 existing.stateStartMs = Date.now();
             }
-            
+
             assignRingOffsets(existing);
         } else {
             const stack: EntityStack = {
@@ -102,29 +149,56 @@ export function rebuildStacks(existingMap: Map<string, AnimatableItem>, gridSize
             assignRingOffsets(stack);
             stacks.set(key, stack);
         }
+        // Track membership
+        for (const item of items) entityStackMembership.set(item.entity.id, key);
     }
 }
 
 // ── Ring offset assignment ──────────────────────────────────
 function assignRingOffsets(stack: EntityStack): void {
-    let placed = 0;
+    const count = stack.children.length;
     let outerRadius = 0;
 
-    for (let ri = 0; ri < RINGS.length && placed < stack.children.length; ri++) {
-        const ring = RINGS[ri];
-        const count = Math.min(ring.capacity, stack.children.length - placed);
+    // Use a single perfect circle for up to 18 items
+    if (count <= 18) {
+        // Dynamically scale radius based on count so they don't overlap.
+        // Base circumference ~ 45 pixels per item
+        const circumference = count * 45;
+        // Min radius 55 to avoid overlapping the central hub icon
+        const radius = Math.max(55, circumference / (2 * Math.PI));
+        outerRadius = radius;
+
         for (let i = 0; i < count; i++) {
             const angle = (2 * Math.PI * i) / count - Math.PI / 2; // start from top
-            const childItem = stack.children[placed + i];
+            const childItem = stack.children[i];
             spiderOffsets.set(childItem.entity.id, {
-                targetX: ring.radius * Math.cos(angle),
-                targetY: ring.radius * Math.sin(angle),
+                targetX: radius * Math.cos(angle),
+                targetY: radius * Math.sin(angle),
                 currentX: 0, currentY: 0,
             });
         }
-        placed += count;
-        outerRadius = ring.radius;
+    } else {
+        // For large clusters, use a Fermat's spiral (sunflower) which packs evenly
+        // and forms a beautiful, balanced cluster shape regardless of count.
+        const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)); // ~137.5 degrees
+        for (let i = 0; i < count; i++) {
+            // i + 1 so we don't put the first item exactly at radius 0 (which is the hub)
+            const n = i + 1;
+            // Radius scales with sqrt of count to preserve uniform area/spacing
+            const radius = 35 * Math.sqrt(n);
+            const angle = n * GOLDEN_ANGLE - Math.PI / 2;
+            
+            if (radius > outerRadius) outerRadius = radius;
+
+            const childItem = stack.children[i];
+            spiderOffsets.set(childItem.entity.id, {
+                targetX: radius * Math.cos(angle),
+                targetY: radius * Math.sin(angle),
+                currentX: 0, currentY: 0,
+            });
+        }
     }
+
     stack.outerRadius = outerRadius;
 }
 
@@ -157,4 +231,27 @@ export function isHubEntity(entityId: string): boolean {
         if (s.hubItem.entity.id === entityId) return true;
     }
     return false;
+}
+
+/** Returns true if any stack is currently expanded or expanding. */
+export function isAnyStackExpanded(): boolean {
+    for (const s of stacks.values()) {
+        if (s.state === "expanded" || s.state === "expanding") return true;
+    }
+    return false;
+}
+
+/** Returns true if the given entity is inside a stack that is currently expanded or expanding. */
+export function isEntityInExpandedStack(entityId: string): boolean {
+    const stackId = entityStackMembership.get(entityId);
+    if (!stackId) return false;
+    const s = stacks.get(stackId);
+    return !!s && (s.state === "expanded" || s.state === "expanding");
+}
+
+/** Given an entity ID, returns the central hub's position if it's clustered, or undefined if it's standalone. */
+export function getEntityTargetPosition(entityId: string) {
+    const stackId = entityStackMembership.get(entityId);
+    if (!stackId) return undefined;
+    return stacks.get(stackId)?.hubItem.posRef;
 }

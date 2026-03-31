@@ -17,6 +17,7 @@ import { BordersPlugin } from "@worldwideview/wwv-plugin-borders";
 import { CameraPlugin } from "@worldwideview/wwv-plugin-camera";
 import { MilitaryPlugin } from "@worldwideview/wwv-plugin-military-aviation";
 import { SatellitePlugin } from "@worldwideview/wwv-plugin-satellite";
+import { IranWarStrikesPlugin } from "@worldwideview/wwv-plugin-iranwarlive";
 import { useStore } from "@/core/state/store";
 import { dataBus } from "@/core/data/DataBus";
 import { PanelToggleArrows } from "@/components/layout/PanelToggleArrows";
@@ -68,6 +69,7 @@ export function AppShell() {
                 new CameraPlugin(),
                 new MilitaryPlugin(),
                 new SatellitePlugin(),
+                new IranWarStrikesPlugin(),
             ];
 
             for (const plugin of builtIns) {

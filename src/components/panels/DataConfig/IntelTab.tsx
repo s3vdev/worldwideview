@@ -252,9 +252,9 @@ export function IntelTab() {
                                                 </a>
                                             </div>
                                         ) : (
-                                            <span className="intel-panel__prop-value" style={{ textAlign: "left", lineHeight: 1.5, wordBreak: "break-word", whiteSpace: "pre-wrap" }}>
+                                            <div className="intel-panel__prop-value" style={{ textAlign: "left", lineHeight: 1.5, wordBreak: "break-word", whiteSpace: "pre-wrap", maxHeight: "150px", overflowY: "auto", paddingRight: "var(--space-xs)", width: "100%" }}>
                                                 {String(value)}
-                                            </span>
+                                            </div>
                                         )}
                                     </div>
                                 );

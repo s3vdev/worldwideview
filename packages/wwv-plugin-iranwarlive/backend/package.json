@@ -1,0 +1,16 @@
+{
+  "name": "iranwarlive-backend",
+  "version": "1.0.0",
+  "main": "server.js",
+  "dependencies": {
+    "@fastify/cors": "^11.2.0",
+    "@fastify/rate-limit": "^10.3.0",
+    "better-sqlite3": "^9.6.0",
+    "fastify": "^5.8.4",
+    "zod": "^4.3.6"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "clean:db": "node -e \"const fs=require('fs'); fs.rmSync('data/history.db', {force:true}); fs.rmSync('data/history.db-wal', {force:true}); fs.rmSync('data/history.db-shm', {force:true}); console.log('Reset SQLite Plugin Data.');\""
+  }
+}

@@ -13,10 +13,12 @@ import {
     BillboardCollection,
     LabelCollection,
     DistanceDisplayCondition,
+    HeightReference,
 } from "cesium";
 import type { GeoEntity, CesiumEntityOptions } from "@/core/plugins/PluginTypes";
 import type { AnimatableItem } from "./EntityRenderer";
 import { scratchPosition, getCachedColor } from "./renderCaches";
+import { globalRequestRender } from "./EntityRenderer";
 import { getHiResIconSync, getHiResIcon } from "./iconUpscaler";
 
 /** Default billboard scale applied when plugin does not specify iconScale. */
@@ -45,10 +47,12 @@ export function updateExistingItem(
         const hiRes = getHiResIconSync(options.iconUrl) ?? options.iconUrl;
         if (item.primitive.image !== hiRes) {
             item.primitive.image = hiRes;
-            // Trigger async upscale if we used the raw URL
             if (hiRes === options.iconUrl) {
                 getHiResIcon(options.iconUrl).then((url) => {
-                    if (item.primitive && !item.primitive.isDestroyed?.()) item.primitive.image = url;
+                    if (item.primitive && !item.primitive.isDestroyed?.()) {
+                        item.primitive.image = url;
+                        globalRequestRender();
+                    }
                 });
             }
         }
@@ -85,19 +89,32 @@ export function createNewItem(
             verticalOrigin: VerticalOrigin.CENTER, horizontalOrigin: HorizontalOrigin.CENTER,
             rotation: options.rotation ? -CesiumMath.toRadians(options.rotation) : 0,
             color, scaleByDistance: new NearFarScalar(1e6, 1.0, 2e7, 0.5), id: clickId,
-            eyeOffset: new Cartesian3(0, 0, options.depthBias ?? -1000), // Small depth bias for far-range terrain
-            disableDepthTestDistance: options.disableDepthTestDistance ?? 500_000, distanceDisplayCondition: ddc,
+            eyeOffset: new Cartesian3(0, 0, options.depthBias ?? -10000), // Small depth bias for far-range terrain
+            // WARNING: Do NOT use heightReference: HeightReference.CLAMP_TO_GROUND here.
+            // It causes severe lag/performance drops with thousands of dynamic entities.
+            disableDepthTestDistance: options.disableDepthTestDistance ?? Number.POSITIVE_INFINITY, distanceDisplayCondition: ddc,
         })
         : points.add({
             position: newPosition, pixelSize: options.size || defaultPointSize(), color, outlineColor,
             outlineWidth: options.outlineWidth || 1,
             scaleByDistance: new NearFarScalar(1e6, 1.0, 2e7, 0.5), id: clickId,
-            disableDepthTestDistance: options.disableDepthTestDistance ?? 500_000, distanceDisplayCondition: ddc,
+            disableDepthTestDistance: options.disableDepthTestDistance ?? Number.POSITIVE_INFINITY, distanceDisplayCondition: ddc,
         });
     existingMap.set(entity.id, {
         primitive: addedPrimitive, labelPrimitive: undefined, entity, posRef: newPosition,
         options, baseColor: color, baseOutlineColor: outlineColor, lastHighlightState: 'normal'
     });
+
+    // Trigger async upscale for newly spawned primitives that missed the cache
+    if (options.iconUrl && resolvedIcon === options.iconUrl) {
+        getHiResIcon(options.iconUrl).then((url) => {
+            const bb = addedPrimitive as any;
+            if (bb && !bb.isDestroyed?.()) {
+                bb.image = url;
+                globalRequestRender();
+            }
+        });
+    }
 }
 
 /** Cleanup primitives for entities no longer in visibleEntities. */

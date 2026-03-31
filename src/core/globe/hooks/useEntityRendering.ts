@@ -101,8 +101,8 @@ export function useEntityRendering(
             const distSqr = Cartesian3.magnitudeSquared(viewer.camera.position);
             const altitude = Math.max(0, Math.sqrt(distSqr) - R_WGS84);
 
-            // Re-cluster if altitude changed significantly (5%)
-            if (Math.abs(altitude - lastAltitude) / Math.max(lastAltitude, 1) > 0.05) {
+            // Re-cluster if altitude changed significantly (15%)
+            if (Math.abs(altitude - lastAltitude) / Math.max(lastAltitude, 1) > 0.15) {
                 lastAltitude = altitude;
                 rebuildStacks(animatablesMapRef.current, calculateGridSizeDegrees(altitude));
                 // Call requestRender to ensure the new offsets are drawn in the very next frame

@@ -1,0 +1,14 @@
+{
+  "name": "@worldwideview/wwv-plugin-iranwarlive",
+  "version": "1.0.0",
+  "description": "Iran War Strikes — Live OSINT data sourced from IranWarLive.com",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src"
+  ],
+  "author": "WorldWideView",
+  "peerDependencies": {
+    "@worldwideview/wwv-plugin-sdk": "*"
+  }
+}

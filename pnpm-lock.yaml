@@ -65,6 +65,9 @@ importers:
       insecam-api:
         specifier: ^0.0.3
         version: 0.0.3
+      jose:
+        specifier: ^6.2.2
+        version: 6.2.2
       lucide-react:
         specifier: ^0.576.0
         version: 0.576.0(react@19.2.3)

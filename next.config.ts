@@ -1,5 +1,4 @@
 import type { NextConfig } from "next";
-import webpack from "webpack";
 
 const nextConfig: NextConfig = {
   output: "standalone",
@@ -60,7 +59,7 @@ const nextConfig: NextConfig = {
   env: {
     CESIUM_BASE_URL: "/cesium",
   },
-  webpack: (config, { isServer }) => {
+  webpack: (config, { isServer, webpack }) => {
     if (!isServer) {
       // Define CESIUM_BASE_URL for Cesium's worker resolution
       config.plugins?.push(

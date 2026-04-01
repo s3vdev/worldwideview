@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
     "@worldwideview/wwv-plugin-aviation",
     "@worldwideview/wwv-plugin-borders",
     "@worldwideview/wwv-plugin-camera",
+    "@worldwideview/wwv-plugin-earthquakes",
+    "@worldwideview/wwv-plugin-iranwarlive",
     "@worldwideview/wwv-plugin-maritime",
     "@worldwideview/wwv-plugin-military-aviation",
     "@worldwideview/wwv-plugin-satellite",
@@ -56,10 +58,10 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
-        source: "/api/external/iranwarlive/:path*",
-        // Proxy to the standalone fastify microservice locally or over docker network 
-        // We use process.env to override the url if running Next.js outside docker while the DB is elsewhere 
-        destination: `${process.env.IRANWARLIVE_BACKEND_URL || "http://iranwarlive-backend:5001"}/iranwarlive/:path*`,
+        source: "/api/external/:source*",
+        // Proxy to the shared data engine locally or over docker network 
+        // We use process.env to override the url if running Next.js outside docker
+        destination: `${process.env.WWV_DATA_ENGINE_URL || "http://wwv-data-engine:5050"}/data/:source*`,
       },
     ];
   },

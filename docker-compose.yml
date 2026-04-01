@@ -9,23 +9,42 @@ services:
       - path: .env
         required: false
     environment:
-      - "AUTH_SECRET=${AUTH_SECRET:?AUTH_SECRET is required — generate with: openssl rand -hex 32}"
+      - "AUTH_SECRET=${AUTH_SECRET:-default_secret_for_local_dev}"
       - "WWV_DEMO_ADMIN_SECRET=${WWV_DEMO_ADMIN_SECRET:-}"
       - "WWV_BRIDGE_TOKEN=${WWV_BRIDGE_TOKEN:-}"
 
-  iranwarlive-backend:
-    build: ./packages/wwv-plugin-iranwarlive/backend
+  wwv-data-engine:
+    build: 
+      context: .
+      dockerfile: ./packages/wwv-data-engine/Dockerfile
     volumes:
-      - iranwarlive-data:/app/data
+      - engine-data:/app/packages/wwv-data-engine/data
     restart: always
+    depends_on:
+      - redis
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - "NODE_ENV=production"
+      - "REDIS_URL=${REDIS_URL:-redis://redis:6379}"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.iranwarlive-api.rule=Host(`api.worldwideview.dev`) && PathPrefix(`/iranwarlive`)"
-      - "traefik.http.routers.iranwarlive-api.entrypoints=websecure"
-      - "traefik.http.routers.iranwarlive-api.tls=true"
-      - "traefik.http.routers.iranwarlive-api.tls.certresolver=letsencrypt"
-      - "traefik.http.services.iranwarlive-api.loadbalancer.server.port=5001"
+      - "traefik.http.routers.data-engine.rule=Host(`api.worldwideview.dev`) && PathPrefix(`/data`)"
+      - "traefik.http.routers.data-engine.entrypoints=websecure"
+      - "traefik.http.routers.data-engine.tls=true"
+      - "traefik.http.routers.data-engine.tls.certresolver=letsencrypt"
+      - "traefik.http.services.data-engine.loadbalancer.server.port=5050"
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
 
 volumes:
   wwv-data:
-  iranwarlive-data:
+  engine-data:
+  redis-data:

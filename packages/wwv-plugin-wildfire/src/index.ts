@@ -47,7 +47,7 @@ export class WildfirePlugin implements WorldPlugin {
 
     async fetch(_timeRange: TimeRange): Promise<GeoEntity[]> {
         try {
-            const res = await globalThis.fetch("/api/wildfire", { headers: buildUserKeyHeaders() });
+            const res = await globalThis.fetch("/api/external/wildfires", { headers: buildUserKeyHeaders() });
             if (!res.ok) throw new Error(`Wildfire API returned ${res.status}`);
             const data = await res.json();
             if (!data.fires || !Array.isArray(data.fires)) return [];

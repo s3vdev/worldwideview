@@ -23,6 +23,7 @@
     "@worldwideview/wwv-plugin-aviation": "*",
     "@worldwideview/wwv-plugin-borders": "*",
     "@worldwideview/wwv-plugin-camera": "*",
+    "@worldwideview/wwv-plugin-earthquakes": "workspace:*",
     "@worldwideview/wwv-plugin-iranwarlive": "workspace:*",
     "@worldwideview/wwv-plugin-maritime": "*",
     "@worldwideview/wwv-plugin-military-aviation": "*",

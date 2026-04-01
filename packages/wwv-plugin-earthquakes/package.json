@@ -1,0 +1,9 @@
+{
+  "name": "@worldwideview/wwv-plugin-earthquakes",
+  "version": "1.0.0",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@worldwideview/wwv-plugin-sdk": "workspace:*",
+    "lucide-react": "^0.368.0"
+  }
+}

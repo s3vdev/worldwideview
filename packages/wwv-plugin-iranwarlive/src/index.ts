@@ -35,10 +35,8 @@ export class IranWarStrikesPlugin implements WorldPlugin {
 
     async fetch(_timeRange: TimeRange): Promise<GeoEntity[]> {
         try {
-            // We route through Next.js rewrites to hit the standalone microservice backend seamlessly
-            // Configured to default to our internal API proxy path (`/api/external/iranwarlive`)
-            const apiUrl = process.env.NEXT_PUBLIC_IRANWARLIVE_API || "https://api.worldwideview.dev/iranwarlive";
-            const res = await globalThis.fetch(`${apiUrl}/history`);
+            // We route through Next.js rewrites to hit the shared data engine backend seamlessly
+            const res = await globalThis.fetch("/api/external/iranwarlive/history");
             
             if (!res.ok) throw new Error(`IranWarLive Backend returned ${res.status}`);
             

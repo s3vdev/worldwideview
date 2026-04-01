@@ -76,7 +76,7 @@ export class MaritimePlugin implements WorldPlugin {
 
     async fetch(_timeRange: TimeRange): Promise<GeoEntity[]> {
         try {
-            const res = await fetch("/api/maritime");
+            const res = await fetch("/api/external/maritime?lookback=6h");
             if (!res.ok) throw new Error(`Maritime API returned ${res.status}`);
             const data = await res.json();
             const vessels = data.vessels || generateDemoVessels();

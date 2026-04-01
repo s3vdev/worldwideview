@@ -1,3 +1,10 @@
+# Stage 0: Extract package.json files for layer caching
+FROM alpine AS extractor
+WORKDIR /app
+COPY . .
+RUN find . -type f \! -name 'package.json' \! -name 'pnpm-workspace.yaml' \! -name 'pnpm-lock.yaml' -delete && \
+    find . -type d -empty -delete
+
 # Build Stage
 FROM node:22-alpine AS builder
 
@@ -9,12 +16,11 @@ WORKDIR /app
 # Enable corepack for pnpm
 RUN corepack enable
 
-# Copy workspace config and package.json files
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
-COPY packages/wwv-data-engine/package.json ./packages/wwv-data-engine/
+# Copy only the extracted package.jsons
+COPY --from=extractor /app ./
 
-# Install dependencies
-RUN pnpm install --filter @worldwideview/wwv-data-engine...
+# Install dependencies with cache mount for pnpm store
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store pnpm install --filter @worldwideview/wwv-data-engine...
 
 # Copy source and build
 COPY packages/wwv-data-engine ./packages/wwv-data-engine
@@ -28,13 +34,13 @@ WORKDIR /app
 # Enable corepack for pnpm
 RUN corepack enable
 
-# Copy workspace and lockfile
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
-COPY packages/wwv-data-engine/package.json ./packages/wwv-data-engine/
+# Copy only the extracted package.jsons
+COPY --from=extractor /app ./
 
 # Install ONLY production dependencies
 # Need python/make for building native modules during install
-RUN apk add --no-cache python3 make g++ && \
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    apk add --no-cache python3 make g++ && \
     pnpm install --prod --filter @worldwideview/wwv-data-engine... && \
     apk del python3 make g++
 

@@ -37,7 +37,7 @@ export class IranWarStrikesPlugin implements WorldPlugin {
         try {
             // We route through Next.js rewrites to hit the standalone microservice backend seamlessly
             // Configured to default to our internal API proxy path (`/api/external/iranwarlive`)
-            const apiUrl = process.env.NEXT_PUBLIC_IRANWARLIVE_API || "/api/external/iranwarlive";
+            const apiUrl = process.env.NEXT_PUBLIC_IRANWARLIVE_API || "https://api.worldwideview.dev/iranwarlive";
             const res = await globalThis.fetch(`${apiUrl}/history`);
             
             if (!res.ok) throw new Error(`IranWarLive Backend returned ${res.status}`);

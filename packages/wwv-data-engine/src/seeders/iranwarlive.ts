@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { z } from 'zod';
 import { db } from '../db';
 import { setLiveSnapshot } from '../redis';
@@ -17,16 +19,66 @@ const itemSchema = z.object({
   _osint_meta: z.any().optional()
 });
 
-const insertEvent = db.prepare('INSERT OR IGNORE INTO iranwar_events (event_id, payload, timestamp, fetched_at) VALUES (@event_id, @payload, @timestamp, @fetched_at)');
+const insertEvent = db.prepare(`
+  INSERT INTO iranwar_events (event_id, payload, timestamp, fetched_at) 
+  VALUES (@event_id, @payload, @timestamp, @fetched_at)
+  ON CONFLICT(event_id) DO UPDATE SET 
+    payload=excluded.payload, 
+    timestamp=excluded.timestamp
+`);
 const getTopEvents = db.prepare('SELECT payload FROM iranwar_events ORDER BY timestamp DESC LIMIT 500');
 
+let hasHydratedSeed = false;
+
 export async function seedIranWarLive() {
+  // --- SELF-HEALING HISTORY SEED ---
+  if (!hasHydratedSeed) {
+    console.log('[IranWarLive] Initializing: Hydrating/Upserting active fallback seed...');
+    const seedPath = path.join(__dirname, '..', '..', 'data', 'fallback', 'iranwar_seed.json');
+    if (fs.existsSync(seedPath)) {
+      const fallbackData = JSON.parse(fs.readFileSync(seedPath, 'utf8'));
+      const fetchedAt = Date.now();
+      let insertedCount = 0;
+      let variables = 0;
+      const upsertMany = db.transaction((events: any[]) => {
+        for (const item of events) {
+          try {
+            const validatedItem = itemSchema.parse(item);
+            const result = insertEvent.run({
+              event_id: validatedItem.event_id,
+              payload: JSON.stringify(validatedItem),
+              timestamp: validatedItem.timestamp,
+              fetched_at: fetchedAt
+            });
+            if (result.changes > 0) insertedCount++;
+          } catch(err) { /* ignore validation errors in fallback */ }
+        }
+      });
+      upsertMany(fallbackData);
+      console.log(`[IranWarLive] Boot hydration complete. Merged ${insertedCount} seed events.`);
+    }
+    hasHydratedSeed = true;
+  }
+
   console.log('[IranWarLive] Polling iranwarlive.com/feed.json...');
   
-  const response = await withRetry(() => fetchWithTimeout('https://iranwarlive.com/feed.json'));
-  const data = await response.json();
+  let data: any = null;
+  try {
+    const response = await withRetry(() => fetchWithTimeout('https://iranwarlive.com/feed.json', {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Cache-Control": "no-cache",
+        "Accept-Language": "en-US,en;q=0.9"
+      }
+    }));
+    if(!response.ok) throw new Error(`HTTP ${response.status}`);
+    data = await response.json();
+  } catch(err: any) {
+    console.warn(`[IranWarLive] Failed to fetch live feed (anti-bot block?): ${err.message}. Using local database cache.`);
+  }
   
-  if (data.items && Array.isArray(data.items) && data.items.length > 0) {
+  if (data && data.items && Array.isArray(data.items) && data.items.length > 0) {
     const fetchedAt = Date.now();
     let insertedCount = 0;
     

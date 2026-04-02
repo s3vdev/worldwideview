@@ -1,6 +1,6 @@
 import WebSocket from 'ws';
 import { db } from '../db';
-import { redis } from '../redis';
+import { redis, setLiveSnapshot } from '../redis';
 import { registerSeeder } from '../scheduler';
 
 const AISSTREAM_URL = 'wss://stream.aisstream.io/v0/stream';
@@ -8,6 +8,7 @@ const API_KEY = process.env.AISSTREAM_API_KEY;
 
 // Buffer to batch SQLite inserts
 let messageBuffer: any[] = [];
+const activeFleetCache = new Map<string, any>();
 const FLUSH_INTERVAL_MS = 5000;
 
 // SQLite insert statement
@@ -53,11 +54,15 @@ async function flushBuffer() {
       // console.log(`[Maritime] Flushed ${insertedCount} new positions to SQLite history`);
     }
 
-    // 2. Pipeline update to Redis Hot Cache
-    // We maintain a Redis HASH of all active ships: HSET data:maritime:live <mmsi> <json>
-    // We use pipelining (Redis best practice: conn-pipelining) for bulk ops
-    const pipeline = redis.pipeline();
-    
+    // 2. Update memory cache and serialize to snapshot
+    const nowSecs = Math.floor(Date.now() / 1000);
+    // Cleanup stale ships (>6 hours)
+    for (const [mmsi, ship] of activeFleetCache.entries()) {
+      if (nowSecs - ship.last_updated > 6 * 3600) {
+        activeFleetCache.delete(mmsi);
+      }
+    }
+
     for (const msg of batch) {
       if (!msg.MetaData?.MMSI || !msg.Message?.PositionReport) continue;
       const mmsi = msg.MetaData.MMSI.toString();
@@ -75,13 +80,10 @@ async function flushBuffer() {
         last_updated: ts
       };
       
-      pipeline.hset('data:maritime:live', mmsi, JSON.stringify(shipState));
+      activeFleetCache.set(mmsi, shipState);
     }
     
-    await pipeline.exec();
-
-    // Expire the entire hash after 6 hours if no updates (best practice: ram-ttl)
-    await redis.expire('data:maritime:live', 6 * 3600);
+    await setLiveSnapshot('maritime', Object.fromEntries(activeFleetCache), 6 * 3600);
 
   } catch (err) {
     console.error('[Maritime] Buffer flush failed:', err);

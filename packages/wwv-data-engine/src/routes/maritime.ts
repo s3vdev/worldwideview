@@ -1,6 +1,6 @@
 import { fastify } from '../server';
 import { db } from '../db';
-import { redis } from '../redis';
+import { redis, getLiveSnapshot } from '../redis';
 
 const getHistoryQuery = db.prepare(`
   SELECT ts, lat, lon, hdg, spd 
@@ -23,8 +23,8 @@ fastify.get('/data/maritime', async (request: any, reply) => {
   }
 
   // 1. Get hot fleet from Redis (O(1) HGETALL)
-  const activeFleetRaw = await redis.hgetall('data:maritime:live');
-  const activeFleet = Object.values(activeFleetRaw).map(str => JSON.parse(str));
+  const fleetObj = await getLiveSnapshot('maritime') || {};
+  const activeFleet = Object.values(fleetObj) as any[];
   const nowTs = Math.floor(Date.now() / 1000);
 
   // Filter out ships that haven't moved in the lookback window (or 1 hour default)

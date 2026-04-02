@@ -8,6 +8,23 @@ export const fastify = Fastify({
   logger: false // Keep it clean for the console
 });
 
+import fastifyWebsocket from '@fastify/websocket';
+import fastifyRateLimit from '@fastify/rate-limit';
+import { handleConnection } from './websocket';
+
+fastify.register(fastifyRateLimit, {
+  max: 100,
+  timeWindow: '1 minute'
+});
+
+fastify.register(fastifyWebsocket);
+
+fastify.register(async function (fastify) {
+  fastify.get('/stream', { websocket: true }, (connection: any, req) => {
+    handleConnection(connection, req);
+  });
+});
+
 const PORT = parseInt(process.env.PORT || '5001', 10);
 
 fastify.get('/health', async (request, reply) => {

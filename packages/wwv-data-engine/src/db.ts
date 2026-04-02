@@ -70,5 +70,25 @@ export function initDB() {
     CREATE INDEX IF NOT EXISTS idx_maritime_history_mmsi_ts ON maritime_history(mmsi, ts);
   `);
 
+  // Aviation history table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS aviation_history (
+      icao24 TEXT NOT NULL,
+      ts INTEGER NOT NULL,
+      lat REAL,
+      lon REAL,
+      alt REAL,
+      hdg REAL,
+      spd REAL,
+      fetched_at INTEGER NOT NULL,
+      PRIMARY KEY (icao24, ts)
+    )
+  `);
+  
+  // Index for fast aviation history lookups by ICAO24 + time range
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_aviation_history_icao24_ts ON aviation_history(icao24, ts);
+  `);
+
   console.log('[DB] All tables initialized successfully.');
 }

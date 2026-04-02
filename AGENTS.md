@@ -89,13 +89,16 @@ worldwideview/
 
 ### 4.1 Plugin System (Core Abstraction)
 
-Every data source is a **plugin** implementing the `WorldPlugin` interface from `@worldwideview/wwv-plugin-sdk`. The lifecycle is:
+Every data source is a **plugin** implementing the `WorldPlugin` interface from `@worldwideview/wwv-plugin-sdk`. The lifecycle utilizes a real-time WebSocket Firehose pipeline:
 
-```
+```text
 PluginRegistry.register() → PluginManager.registerPlugin()
-  → plugin.initialize(context) → PollingManager.register()
-  → PluginManager.enablePlugin() → plugin.fetch(timeRange)
-  → DataBus.emit("dataUpdated") → Store → EntityRenderer → Globe
+  → plugin.initialize(context)
+  
+Visibility Toggle → DataBusSubscriber subscribes to layer via WsClient
+  → Engine responds with instantaneous websocket snapshots over /stream
+  → WsClient pipes to DataBus.emit("dataUpdated", WsStreamPayload) 
+  → Store → EntityRenderer → Globe
 ```
 
 Three plugin architectures exist:
@@ -115,11 +118,10 @@ Zustand store with **nine slices**: `globe`, `layers`, `timeline`, `ui`, `filter
 
 ### 4.3 Data Pipeline
 
-```
-Plugin.fetch() → PluginManager.handleDataUpdate()
-  → CacheLayer.set() (memory + IndexedDB)
-  → DataBus.emit("dataUpdated")
-  → DataBusSubscriber → Store.entitiesByPlugin
+```text
+Engine push /stream → DataBusSubscriber WsClient router
+  → WsClient.handleMessage() → DataBus.emit("websocketData") 
+  → DataBusSubscriber → _hydrateSnapshot() → Store.entitiesByPlugin
   → GlobeView (memoized visible entities)
   → EntityRenderer (billboard/point primitives)
   → AnimationLoop (horizon culling, hover/selection)

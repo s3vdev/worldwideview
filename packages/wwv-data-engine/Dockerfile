@@ -46,6 +46,7 @@ RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
 
 # Copy built artifacts from builder
 COPY --from=builder /app/packages/wwv-data-engine/dist ./packages/wwv-data-engine/dist
+COPY --from=builder /app/packages/wwv-data-engine/seedData ./packages/wwv-data-engine/seedData
 
 WORKDIR /app/packages/wwv-data-engine
 

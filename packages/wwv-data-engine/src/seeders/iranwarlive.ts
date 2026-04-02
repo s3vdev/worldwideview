@@ -34,7 +34,7 @@ export async function seedIranWarLive() {
   // --- SELF-HEALING HISTORY SEED ---
   if (!hasHydratedSeed) {
     console.log('[IranWarLive] Initializing: Hydrating/Upserting active fallback seed...');
-    const seedPath = path.join(__dirname, '..', '..', 'data', 'fallback', 'iranwar_seed.json');
+    const seedPath = path.join(__dirname, '..', '..', 'seedData', 'iranwar_seed.json');
     if (fs.existsSync(seedPath)) {
       const fallbackData = JSON.parse(fs.readFileSync(seedPath, 'utf8'));
       const fetchedAt = Date.now();

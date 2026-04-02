@@ -8,7 +8,7 @@ const ROTATION_THRESHOLD = 50;
 const POLLING_INTERVAL_MS = 15000;
 
 let messageBuffer: any[] = [];
-const FLUSH_INTERVAL_MS = 5000;
+const FLUSH_INTERVAL_MS = 15000;
 
 interface OpenSkyCredential {
     clientId: string;

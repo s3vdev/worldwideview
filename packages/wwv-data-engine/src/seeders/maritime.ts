@@ -9,7 +9,8 @@ const API_KEY = process.env.AISSTREAM_API_KEY;
 // Buffer to batch SQLite inserts
 let messageBuffer: any[] = [];
 const activeFleetCache = new Map<string, any>();
-const FLUSH_INTERVAL_MS = 5000;
+const FLUSH_INTERVAL_MS = 15000;
+let isFlushIntervalRunning = false;
 
 // SQLite insert statement
 const insertHistory = db.prepare(`
@@ -132,8 +133,11 @@ export function startMaritimeWebsocket() {
     setTimeout(startMaritimeWebsocket, 5000);
   });
 
-  // Start background flush loop
-  setInterval(flushBuffer, FLUSH_INTERVAL_MS);
+  // Start background flush loop safely
+  if (!isFlushIntervalRunning) {
+    setInterval(flushBuffer, FLUSH_INTERVAL_MS);
+    isFlushIntervalRunning = true;
+  }
 }
 
 // Register initialization logic. No cron needed, runs infinitely.

@@ -30,23 +30,38 @@ redis.on('ready', () => {
 
 import { broadcastPluginData } from './websocket';
 
+const lastSnapshotTimes = new Map<string, number>();
+const SNAPSHOT_THROTTLE_MS = 5 * 60 * 1000; // 5 minutes
+
 /**
  * Convenience method to write a JSON payload to Redis with an expiration.
+ * Writes are throttled to save Redis requests, but websockets are always broadcasted.
  */
 export async function setLiveSnapshot(source: string, payload: any, ttlSeconds: number) {
-  const key = `data:${source}:live`;
   try {
-    const jsonStr = JSON.stringify(payload);
-    // Compress JSON strings to drastically reduce Upstash payload size (bypasses 10MB limits)
-    const compressed = zlib.gzipSync(Buffer.from(jsonStr, 'utf-8'));
-    await redis.set(key, compressed as any, 'EX', ttlSeconds);
-    // Also save a metadata key so healthcheck can verify without pulling full payload
-    await redis.set(`meta:${source}:last_run`, Date.now().toString(), 'EX', ttlSeconds * 2);
-    
-    // Broadcast newly updated entities to any active WebSocket subscribers
+    // 1. ALWAYS broadcast newly updated entities to any active WebSocket subscribers
+    // The data pipeline relies on this for high-frequency HUD updates.
     broadcastPluginData(source, payload);
 
-    console.log(`[Redis] Snapshot saved for ${source} (${(compressed.length / 1024).toFixed(2)} KB)`);
+    // 2. Throttle Redis snapshots to prevent blowing past 500K max request limits (e.g. Upstash)
+    const now = Date.now();
+    const lastTime = lastSnapshotTimes.get(source) || 0;
+    if (now - lastTime < SNAPSHOT_THROTTLE_MS) {
+      return; // Skip Redis write
+    }
+    lastSnapshotTimes.set(source, now);
+
+    const key = `data:${source}:live`;
+    const jsonStr = JSON.stringify(payload);
+    
+    // Compress JSON strings to drastically reduce Upstash payload size
+    const compressed = zlib.gzipSync(Buffer.from(jsonStr, 'utf-8'));
+    await redis.set(key, compressed as any, 'EX', ttlSeconds);
+    
+    // Also save a metadata key so healthcheck can verify
+    await redis.set(`meta:${source}:last_run`, Date.now().toString(), 'EX', ttlSeconds * 2);
+
+    console.log(`[Redis] Snapshot saved to Redis for ${source} (${(compressed.length / 1024).toFixed(2)} KB)`);
   } catch (error) {
     console.error(`[Redis] Failed to snapshot ${source}:`, error);
   }

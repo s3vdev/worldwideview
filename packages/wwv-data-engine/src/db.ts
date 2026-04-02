@@ -90,5 +90,25 @@ export function initDB() {
     CREATE INDEX IF NOT EXISTS idx_aviation_history_icao24_ts ON aviation_history(icao24, ts);
   `);
 
+  // Military Aviation history table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS military_aviation_history (
+      hex TEXT NOT NULL,
+      ts INTEGER NOT NULL,
+      lat REAL,
+      lon REAL,
+      alt REAL,
+      hdg REAL,
+      spd REAL,
+      fetched_at INTEGER NOT NULL,
+      PRIMARY KEY (hex, ts)
+    )
+  `);
+  
+  // Index for fast military aviation history lookups by hex + time range
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_military_aviation_history_hex_ts ON military_aviation_history(hex, ts);
+  `);
+
   console.log('[DB] All tables initialized successfully.');
 }

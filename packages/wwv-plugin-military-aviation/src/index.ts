@@ -10,7 +10,7 @@ interface AdsbFiAircraft {
     lat?: number; lon?: number; alt_baro?: number | "ground";
     alt_geom?: number; gs?: number; track?: number; squawk?: string;
     dbFlags?: number; category?: string; emergency?: string;
-    seen?: number; seen_pos?: number;
+    seen?: number; seen_pos?: number; history?: any[];
 }
 
 function militaryAltitudeToColor(altFeet: number | null): string {
@@ -37,12 +37,13 @@ export class MilitaryPlugin implements WorldPlugin {
 
     async fetch(_timeRange: TimeRange): Promise<GeoEntity[]> {
         try {
-            const res = await fetch("/api/military");
+            const res = await globalThis.fetch("/api/external/military-aviation");
             if (!res.ok) throw new Error(`Military API returned ${res.status}`);
             const data = await res.json();
-            if (!data.ac || !Array.isArray(data.ac)) return [];
+            const aircraftList = data.ac || data.items; // Fallback just in case payload standardizes
+            if (!aircraftList || !Array.isArray(aircraftList)) return [];
 
-            return data.ac
+            return aircraftList
                 .filter((ac: AdsbFiAircraft) => ac.lat != null && ac.lon != null)
                 .map((ac: AdsbFiAircraft): GeoEntity => {
                     const altFeet = typeof ac.alt_baro === "number" ? ac.alt_baro : null;
@@ -55,7 +56,15 @@ export class MilitaryPlugin implements WorldPlugin {
                         heading: ac.track ?? undefined, speed: ac.gs ?? undefined,
                         timestamp: new Date(),
                         label: ac.flight?.trim() || ac.r || ac.hex,
-                        properties: { hex: ac.hex, callsign: ac.flight?.trim() || null, registration: ac.r || null, aircraft_type: ac.t || null, altitude_ft: altFeet, altitude_m: altMeters, ground_speed_kts: ac.gs ?? null, heading: ac.track ?? null, squawk: ac.squawk || null, on_ground: isOnGround, category: ac.category || null, emergency: ac.emergency || null },
+                        properties: { 
+                            hex: ac.hex, callsign: ac.flight?.trim() || null, 
+                            registration: ac.r || null, aircraft_type: ac.t || null, 
+                            altitude_ft: altFeet, altitude_m: altMeters, ground_speed_kts: ac.gs ?? null, 
+                            heading: ac.track ?? null, squawk: ac.squawk || null, 
+                            on_ground: isOnGround, category: ac.category || null, 
+                            emergency: ac.emergency || null,
+                            history: ac.history || []
+                        },
                     };
                 });
         } catch (err) {
@@ -64,7 +73,7 @@ export class MilitaryPlugin implements WorldPlugin {
         }
     }
 
-    getPollingInterval(): number { return 60000; }
+    getPollingInterval(): number { return 0; }
     getLayerConfig(): LayerConfig { return { color: "#ff6f00", clusterEnabled: true, clusterDistance: 40, maxEntities: 3000 }; }
 
     renderEntity(entity: GeoEntity): CesiumEntityOptions {
@@ -84,7 +93,7 @@ export class MilitaryPlugin implements WorldPlugin {
     }
 
     getServerConfig(): ServerPluginConfig {
-        return { apiBasePath: "/api/military", pollingIntervalMs: 60000, requiresAuth: false };
+        return { apiBasePath: "/api/external/military-aviation", pollingIntervalMs: 0, historyEnabled: true };
     }
 
     getFilterDefinitions(): FilterDefinition[] {

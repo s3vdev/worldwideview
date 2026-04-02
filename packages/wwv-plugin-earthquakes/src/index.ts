@@ -8,6 +8,7 @@ import {
     type LayerConfig,
     type CesiumEntityOptions,
     type FilterDefinition,
+    type ServerPluginConfig,
 } from "@worldwideview/wwv-plugin-sdk";
 
 function magToColor(mag: number): string {
@@ -66,7 +67,11 @@ export class EarthquakesPlugin implements WorldPlugin {
         }
     }
 
-    getPollingInterval(): number { return 300000; } // 5 minutes
+    getPollingInterval(): number { return 0; } // 0 for WebSocket push
+
+    getServerConfig(): ServerPluginConfig {
+        return { apiBasePath: "/api/external/earthquakes", pollingIntervalMs: 0, historyEnabled: true };
+    }
     
     getLayerConfig(): LayerConfig {
         return { color: "#f97316", clusterEnabled: true, clusterDistance: 40 };

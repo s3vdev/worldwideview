@@ -8,6 +8,7 @@ import {
     type LayerConfig,
     type CesiumEntityOptions,
     type FilterDefinition,
+    type ServerPluginConfig,
 } from "@worldwideview/wwv-plugin-sdk";
 import { MaritimeSettings } from "./MaritimeSettings";
 
@@ -30,45 +31,7 @@ function getVesselColor(type: string): string {
     return VESSEL_COLORS.other;
 }
 
-function generateDemoVessels(): GeoEntity[] {
-    const vessels = [
-        { name: "EVER GIVEN", mmsi: "353136000", type: "cargo", lat: 30.0, lon: 32.5, speed: 12.5, heading: 340 },
-        { name: "MAERSK SEALAND", mmsi: "220417000", type: "cargo", lat: 51.9, lon: 1.2, speed: 15.0, heading: 210 },
-        { name: "PACIFIC RUBY", mmsi: "538004561", type: "tanker", lat: 1.2, lon: 103.7, speed: 8.3, heading: 125 },
-        { name: "QUEEN MARY 2", mmsi: "310627000", type: "passenger", lat: 40.6, lon: -74.0, speed: 22.0, heading: 90 },
-        { name: "OCEAN EXPLORER", mmsi: "245390000", type: "fishing", lat: -33.8, lon: 18.4, speed: 4.2, heading: 180 },
-        { name: "ARCTIC SUNRISE", mmsi: "246585000", type: "other", lat: 69.0, lon: 18.0, speed: 6.0, heading: 45 },
-        { name: "BLUE MARLIN", mmsi: "244870698", type: "cargo", lat: 22.3, lon: 113.9, speed: 10.5, heading: 270 },
-        { name: "STENA BULK", mmsi: "265548750", type: "tanker", lat: 57.7, lon: 11.9, speed: 12.0, heading: 300 },
-        { name: "SPIRIT OF BRITAIN", mmsi: "235082198", type: "passenger", lat: 50.9, lon: 1.4, speed: 20.0, heading: 160 },
-        { name: "DEEP BLUE", mmsi: "538006050", type: "fishing", lat: -4.0, lon: 39.6, speed: 3.5, heading: 95 },
-        { name: "CRIMSON ACE", mmsi: "477558200", type: "tanker", lat: 26.2, lon: 56.3, speed: 14.0, heading: 200 },
-        { name: "SAGA HORIZON", mmsi: "311000596", type: "passenger", lat: 35.3, lon: 139.6, speed: 18.0, heading: 0 },
-        { name: "ATLANTIC GUARDIAN", mmsi: "219354000", type: "tug", lat: 56.1, lon: -3.2, speed: 7.5, heading: 245 },
-        { name: "JADE STAR", mmsi: "636092783", type: "cargo", lat: -12.0, lon: -77.0, speed: 11.0, heading: 320 },
-        { name: "NORTHERN SPIRIT", mmsi: "257038700", type: "fishing", lat: 62.4, lon: 6.1, speed: 5.0, heading: 170 },
-    ];
 
-    return vessels.map((v) => {
-        const history = [];
-        let curLon = v.lon; let curLat = v.lat;
-        // Synthetic mock history behind the vessel
-        for (let i = 40; i > 0; i--) {
-            history.push({ lat: curLat + (i * 0.01), lon: curLon - (i * 0.01), ts: Date.now() - (i * 60000) });
-        }
-        return {
-            id: `maritime-${v.mmsi}`,
-            pluginId: "maritime",
-            latitude: v.lat + (Math.random() - 0.5) * 0.02,
-            longitude: v.lon + (Math.random() - 0.5) * 0.02,
-            heading: v.heading,
-            speed: v.speed,
-            timestamp: new Date(),
-            label: v.name,
-            properties: { mmsi: v.mmsi, vesselName: v.name, vesselType: v.type, speed_knots: v.speed, heading: v.heading, history },
-        };
-    });
-}
 
 export class MaritimePlugin implements WorldPlugin {
     id = "maritime";
@@ -98,7 +61,7 @@ export class MaritimePlugin implements WorldPlugin {
             const res = await fetch(`/api/external/maritime${query}`);
             if (!res.ok) throw new Error(`Maritime API returned ${res.status}`);
             const data = await res.json();
-            const vessels = data.items || generateDemoVessels();
+            const vessels = data.items || [];
             return vessels.map((v: any) => {
                 // Handle both GeoEntity structure and data-engine structure
                 return {
@@ -120,13 +83,18 @@ export class MaritimePlugin implements WorldPlugin {
                     },
                 };
             });
-        } catch {
-            return generateDemoVessels();
+        } catch (err) {
+            console.error("[MaritimePlugin] Fetch error:", err);
+            return [];
         }
     }
 
     getPollingInterval(): number {
         return 0; // Disabled in favor of WebSocket firehose
+    }
+
+    getServerConfig(): ServerPluginConfig {
+        return { apiBasePath: "/api/external/maritime", pollingIntervalMs: 0, historyEnabled: true };
     }
 
     getLayerConfig(): LayerConfig {

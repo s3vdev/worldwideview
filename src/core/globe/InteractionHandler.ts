@@ -93,6 +93,16 @@ export function setupInteractionHandlers(
     );
 
     let latestHoverRequestId = 0;
+    let hoverTimeout: ReturnType<typeof setTimeout> | null = null;
+    let isDragging = false;
+
+    // Track mouse dragging states to avoid expensive picking during camera pan
+    handler.setInputAction(() => { isDragging = true; }, ScreenSpaceEventType.LEFT_DOWN);
+    handler.setInputAction(() => { isDragging = false; }, ScreenSpaceEventType.LEFT_UP);
+    handler.setInputAction(() => { isDragging = true; }, ScreenSpaceEventType.RIGHT_DOWN);
+    handler.setInputAction(() => { isDragging = false; }, ScreenSpaceEventType.RIGHT_UP);
+    handler.setInputAction(() => { isDragging = true; }, ScreenSpaceEventType.MIDDLE_DOWN);
+    handler.setInputAction(() => { isDragging = false; }, ScreenSpaceEventType.MIDDLE_UP);
 
     // Hover → show tooltip card only
     handler.setInputAction(
@@ -105,31 +115,37 @@ export function setupInteractionHandlers(
 
             if (!viewer || viewer.isDestroyed()) return;
             if (viewer.scene.mode === SceneMode.MORPHING) return;
+            
+            if (isDragging) return;
 
             latestHoverRequestId++;
             const currentRequestId = latestHoverRequestId;
 
-            const entity = findEntityAtPosition(viewer, pos);
-            
-            if (currentRequestId !== latestHoverRequestId) {
-                return; // Another mouse move happened, ignore this result
-            }
+            if (hoverTimeout) clearTimeout(hoverTimeout);
 
-            const prevId = hoveredEntityIdRef.current;
-            const newId = entity ? entity.id : null;
+            hoverTimeout = setTimeout(() => {
+                if (currentRequestId !== latestHoverRequestId) return;
+                if (!viewer || viewer.isDestroyed() || isDragging) return;
 
-            if (prevId !== newId) {
-                hoveredEntityIdRef.current = newId;
-                canvas.style.cursor = entity ? "pointer" : "default";
-                useStore.getState().setHoveredEntity(entity, entity ? pos : null);
-                // Trigger render to apply hover highlights immediately
-                viewer.scene.requestRender();
-            }
+                const entity = findEntityAtPosition(viewer, pos);
+
+                const prevId = hoveredEntityIdRef.current;
+                const newId = entity ? entity.id : null;
+
+                if (prevId !== newId) {
+                    hoveredEntityIdRef.current = newId;
+                    canvas.style.cursor = entity ? "pointer" : "default";
+                    useStore.getState().setHoveredEntity(entity, entity ? pos : null);
+                    // Trigger render to apply hover highlights immediately
+                    viewer.scene.requestRender();
+                }
+            }, 60);
         },
         ScreenSpaceEventType.MOUSE_MOVE
     );
 
     return () => {
+        if (hoverTimeout) clearTimeout(hoverTimeout);
         handler.destroy();
         canvas.style.cursor = "default";
     };

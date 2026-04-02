@@ -8,6 +8,7 @@ import {
     type LayerConfig,
     type CesiumEntityOptions,
     type FilterDefinition,
+    type ServerPluginConfig,
 } from "@worldwideview/wwv-plugin-sdk";
 
 function typeToIcon(type: string) {
@@ -35,8 +36,7 @@ export class IranWarStrikesPlugin implements WorldPlugin {
 
     async fetch(_timeRange: TimeRange): Promise<GeoEntity[]> {
         try {
-            // We route through Next.js rewrites to hit the shared data engine backend seamlessly
-            const res = await globalThis.fetch("/api/external/iranwarlive/history");
+            const res = await globalThis.fetch("/api/external/iranwarlive");
             
             if (!res.ok) throw new Error(`IranWarLive Backend returned ${res.status}`);
             
@@ -54,7 +54,7 @@ export class IranWarStrikesPlugin implements WorldPlugin {
                     latitude: lat,
                     longitude: lon,
                     timestamp: new Date(item.timestamp),
-                    label: item.type,
+                    label: item.event_id,
                     properties: {
                         type: item.type,
                         confidence: item.confidence,
@@ -73,7 +73,11 @@ export class IranWarStrikesPlugin implements WorldPlugin {
         }
     }
 
-    getPollingInterval(): number { return 60000; } // Poll the fastify backend every minute
+    getPollingInterval(): number { return 0; }
+
+    getServerConfig(): ServerPluginConfig {
+        return { apiBasePath: "/api/external/iranwarlive", pollingIntervalMs: 0, historyEnabled: true };
+    }
 
     getLayerConfig(): LayerConfig {
         return { color: "#ef4444", clusterEnabled: true, clusterDistance: 40 };

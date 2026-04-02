@@ -8,8 +8,8 @@ import {
     type LayerConfig,
     type CesiumEntityOptions,
     type FilterDefinition,
+    type ServerPluginConfig,
 } from "@worldwideview/wwv-plugin-sdk";
-import { buildUserKeyHeaders } from "@/lib/userApiKeys";
 
 function frpToColor(frp: number): string {
     if (frp < 10) return "#fbbf24";
@@ -47,7 +47,7 @@ export class WildfirePlugin implements WorldPlugin {
 
     async fetch(_timeRange: TimeRange): Promise<GeoEntity[]> {
         try {
-            const res = await globalThis.fetch("/api/external/wildfires", { headers: buildUserKeyHeaders() });
+            const res = await globalThis.fetch("/api/external/wildfires");
             if (!res.ok) throw new Error(`Wildfire API returned ${res.status}`);
             const data = await res.json();
             if (!data.fires || !Array.isArray(data.fires)) return [];
@@ -75,7 +75,11 @@ export class WildfirePlugin implements WorldPlugin {
         }
     }
 
-    getPollingInterval(): number { return 300000; }
+    getPollingInterval(): number { return 0; }
+    
+    getServerConfig(): ServerPluginConfig {
+        return { apiBasePath: "/api/external/wildfires", pollingIntervalMs: 0, historyEnabled: true };
+    }
     getLayerConfig(): LayerConfig {
         return { color: "#ef4444", clusterEnabled: true, clusterDistance: 30 };
     }

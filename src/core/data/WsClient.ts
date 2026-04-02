@@ -37,8 +37,8 @@ class WebSocketClient {
       }
     };
 
-    this.ws.onerror = (err) => {
-      console.error("[WSClient] Connection error", err);
+    this.ws.onerror = () => {
+      console.warn("[WSClient] Connection to data engine failed. Retrying in background...");
     };
 
     this.ws.onclose = () => {

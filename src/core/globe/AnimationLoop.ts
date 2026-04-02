@@ -4,7 +4,7 @@ import { useStore } from "@/core/state/store";
 import { createLabel, removeLabel, type AnimatableItem } from "./EntityRenderer";
 import { tickStackAnimation } from "./stackAnimation";
 import { updateModelTransform } from "./ModelManager";
-import { isAnyStackExpanded, isEntityInExpandedStack, getEntityTargetPosition, isEntityClustered } from "./StackManager";
+import { isAnyStackExpanded, isEntityInExpandedStack, getEntityTargetPosition, isEntityClustered, getStackStateVersion } from "./StackManager";
 import {
     HIGHLIGHT_COLOR_SELECTED,
     extrapolatePosition,
@@ -56,6 +56,7 @@ export function createUpdateLoop(
     let prevSelectedId: string | null = null;
     let prevHoveredId: string | null = null;
     let prevAnyExpanded = false;
+    let prevStackVersion = -1;
 
     return () => {
         if (!viewer || viewer.isDestroyed()) return;
@@ -90,6 +91,13 @@ export function createUpdateLoop(
         const anyExpanded = isAnyStackExpanded();
 
         let forceFullPass = false;
+        
+        const currentStackVersion = getStackStateVersion();
+        if (currentStackVersion !== prevStackVersion) {
+            forceFullPass = true;
+            prevStackVersion = currentStackVersion;
+        }
+
         if (anyExpanded !== prevAnyExpanded) {
             forceFullPass = true;
             prevAnyExpanded = anyExpanded;

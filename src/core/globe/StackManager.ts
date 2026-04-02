@@ -56,6 +56,9 @@ export function getStacks(): ReadonlyMap<string, EntityStack> { return stacks; }
 export function getSpiderOffset(entityId: string): SpiderOffset | undefined { return spiderOffsets.get(entityId); }
 
 // ── Coordinate key ──────────────────────────────────────────
+let stackStateVersion = 0;
+export function getStackStateVersion(): number { return stackStateVersion; }
+
 /** Calculate dynamic grid size based on camera altitude. */
 export function calculateGridSizeDegrees(altitude: number): number {
     return Math.max(0.005, (altitude * 0.05) / 111320);
@@ -144,10 +147,10 @@ function applyGroups(groups: Map<string, AnimatableItem[]>): void {
             existing.hubItem = items[0];
             existing.children = items;
 
-            // Force collapse if cluster survived rebuild but needs resizing/re-grouping
             if (needsCollapse && (existing.state === "expanded" || existing.state === "expanding")) {
                 existing.state = "collapsing";
                 existing.stateStartMs = Date.now();
+                stackStateVersion++;
             }
 
             assignRingOffsets(existing);
@@ -221,6 +224,7 @@ export function expandStack(stackId: string): void {
     if (!s || s.state === "expanded" || s.state === "expanding") return;
     s.state = "expanding";
     s.stateStartMs = Date.now();
+    stackStateVersion++;
 }
 
 export function collapseStack(stackId: string): void {
@@ -228,6 +232,7 @@ export function collapseStack(stackId: string): void {
     if (!s || s.state === "collapsed" || s.state === "collapsing") return;
     s.state = "collapsing";
     s.stateStartMs = Date.now();
+    stackStateVersion++;
 }
 
 /** Find the stack that contains a given entity id. */

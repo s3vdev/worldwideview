@@ -62,12 +62,13 @@ export class SatellitePlugin implements WorldPlugin {
 
     async fetch(_timeRange: TimeRange): Promise<GeoEntity[]> {
         try {
-            const res = await globalThis.fetch(`/api/satellite?t=${Date.now()}`);
+            const res = await globalThis.fetch(`/api/external/satellite`);
             if (!res.ok) throw new Error(`Satellite API returned ${res.status}`);
             const data = await res.json();
-            if (!data.satellites || !Array.isArray(data.satellites)) return [];
+            const satelliteItems = data.satellites || data.items || [];
+            if (!satelliteItems || !Array.isArray(satelliteItems)) return [];
 
-            return data.satellites.map(
+            return satelliteItems.map(
                 (sat: SatelliteResponse): GeoEntity => ({
                     id: `satellite-${sat.noradId}`,
                     pluginId: "satellite",
@@ -96,7 +97,7 @@ export class SatellitePlugin implements WorldPlugin {
     }
 
     getPollingInterval(): number {
-        return 60000; // 1 minute — positions change fast
+        return 0; // WS Streaming
     }
 
     getLayerConfig(): LayerConfig {
@@ -171,9 +172,9 @@ export class SatellitePlugin implements WorldPlugin {
 
     getServerConfig(): ServerPluginConfig {
         return {
-            apiBasePath: "/api/satellite",
-            pollingIntervalMs: 60000,
-            historyEnabled: false,
+            apiBasePath: "/api/external/satellite",
+            pollingIntervalMs: 0,
+            historyEnabled: true,
         };
     }
 }

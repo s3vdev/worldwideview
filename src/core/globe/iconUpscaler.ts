@@ -18,10 +18,10 @@ const cache = new Map<string, string>();
 /** In-flight promises to deduplicate concurrent requests for the same URL. */
 const pending = new Map<string, Promise<string>>();
 
-/** Returns the logical size of the output canvas in CSS pixels. Mobile keeps 64px, PC gets smaller 48px. */
-function getBaseSize(): number {
-    if (typeof window === "undefined") return 64;
-    return window.innerWidth <= 768 ? 64 : 48;
+/** Returns the logical size of the output canvas in CSS pixels. Now standardized to 48px on desktop and 32px on mobile. */
+export function getBaseSize(): number {
+    if (typeof window === "undefined") return 48;
+    return window.innerWidth <= 768 ? 32 : 48;
 }
 
 /** Padding ratio — the icon fills (1 - 2*INSET) of the canvas. */

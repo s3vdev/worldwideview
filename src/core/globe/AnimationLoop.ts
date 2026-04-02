@@ -4,7 +4,7 @@ import { useStore } from "@/core/state/store";
 import { createLabel, removeLabel, type AnimatableItem } from "./EntityRenderer";
 import { tickStackAnimation } from "./stackAnimation";
 import { updateModelTransform } from "./ModelManager";
-import { isAnyStackExpanded, isEntityInExpandedStack, getEntityTargetPosition } from "./StackManager";
+import { isAnyStackExpanded, isEntityInExpandedStack, getEntityTargetPosition, isEntityClustered } from "./StackManager";
 import {
     HIGHLIGHT_COLOR_SELECTED,
     extrapolatePosition,
@@ -168,7 +168,11 @@ function processEntity(
         }
     }
 
-    if (primitive.show !== true) primitive.show = true;
+    // Delegate visibility to stackAnimation if the entity is clustered
+    // This prevents the data points from flickering over the cluster badge.
+    if (!isEntityClustered(entity.id) && primitive.show !== true) {
+        primitive.show = true;
+    }
 
     // Highlight styling
     if (item.options.type !== "model") {

@@ -19,7 +19,7 @@ import type { GeoEntity, CesiumEntityOptions } from "@/core/plugins/PluginTypes"
 import type { AnimatableItem } from "./EntityRenderer";
 import { scratchPosition, getCachedColor } from "./renderCaches";
 import { globalRequestRender } from "./EntityRenderer";
-import { getHiResIconSync, getHiResIcon } from "./iconUpscaler";
+import { getHiResIconSync, getHiResIcon, getBaseSize } from "./iconUpscaler";
 
 /** Default billboard scale applied when plugin does not specify iconScale. */
 const DEFAULT_BILLBOARD_SCALE = 0.7;
@@ -44,6 +44,10 @@ export function updateExistingItem(
     if (!Color.equals(item.primitive.color, color)) item.primitive.color = color;
     if (!Cartesian3.equals(item.primitive.position, item.posRef)) item.primitive.position = item.posRef;
     if (options.iconUrl) {
+        const baseSize = getBaseSize();
+        if (item.primitive.width !== baseSize) item.primitive.width = baseSize;
+        if (item.primitive.height !== baseSize) item.primitive.height = baseSize;
+
         const hiRes = getHiResIconSync(options.iconUrl) ?? options.iconUrl;
         if (item.primitive.image !== hiRes) {
             item.primitive.image = hiRes;
@@ -58,6 +62,8 @@ export function updateExistingItem(
         }
         const rot = options.rotation ? -CesiumMath.toRadians(options.rotation) : 0;
         if (item.primitive.rotation !== rot) item.primitive.rotation = rot;
+        if (item.primitive.width !== getBaseSize()) item.primitive.width = getBaseSize();
+        if (item.primitive.height !== getBaseSize()) item.primitive.height = getBaseSize();
         const targetScale = options.iconScale ?? DEFAULT_BILLBOARD_SCALE;
         if (item.primitive.scale !== targetScale) item.primitive.scale = targetScale;
     } else {
@@ -82,9 +88,11 @@ export function createNewItem(
         : undefined;
     // Use the hi-res cached icon if available, otherwise use raw and trigger async upscale
     const resolvedIcon = options.iconUrl ? (getHiResIconSync(options.iconUrl) ?? options.iconUrl) : undefined;
+    const baseSize = getBaseSize();
     const addedPrimitive = options.iconUrl
         ? billboards.add({
             position: newPosition, image: resolvedIcon,
+            width: baseSize, height: baseSize,
             scale: options.iconScale ?? DEFAULT_BILLBOARD_SCALE,
             verticalOrigin: VerticalOrigin.CENTER, horizontalOrigin: HorizontalOrigin.CENTER,
             rotation: options.rotation ? -CesiumMath.toRadians(options.rotation) : 0,

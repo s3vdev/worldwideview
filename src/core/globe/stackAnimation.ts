@@ -116,7 +116,11 @@ function tickSingle(stack: EntityStack, now: number, billboards: BillboardCollec
         // they just won't fan out cleanly unless using billboards, but this project heavily uses billboards.
 
         // Show/hide child items
-        if (isClosed && t >= 1) {
+        if (state === "collapsed") {
+            // A fully collapsed stack should immediately hide its children,
+            // even if newly formed (t < 1) to prevent z-fighting with the hub.
+            if (prim.show) prim.show = false;
+        } else if (state === "collapsing" && t >= 1) {
             if (prim.show) prim.show = false;
         } else if (isOpen || state === "collapsing") {
             const shouldShow = !item._occluded;

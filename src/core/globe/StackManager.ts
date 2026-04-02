@@ -131,11 +131,21 @@ function applyGroups(groups: Map<string, AnimatableItem[]>): void {
         if (items.length < 2) continue;
         const existing = stacks.get(key);
         if (existing) {
+            let needsCollapse = existing.children.length !== items.length;
+            if (!needsCollapse) {
+                for (let i = 0; i < items.length; i++) {
+                    if (existing.children[i].entity.id !== items[i].entity.id) {
+                        needsCollapse = true;
+                        break;
+                    }
+                }
+            }
+
             existing.hubItem = items[0];
             existing.children = items;
 
             // Force collapse if cluster survived rebuild but needs resizing/re-grouping
-            if (existing.state === "expanded" || existing.state === "expanding") {
+            if (needsCollapse && (existing.state === "expanded" || existing.state === "expanding")) {
                 existing.state = "collapsing";
                 existing.stateStartMs = Date.now();
             }
@@ -159,13 +169,16 @@ function assignRingOffsets(stack: EntityStack): void {
     const count = stack.children.length;
     let outerRadius = 0;
 
+    // Scale down spacing for mobile to match reduced icon size
+    const spacingScale = (typeof window !== "undefined" && window.innerWidth <= 768) ? 0.7 : 1.0;
+
     // Use a single perfect circle for up to 18 items
     if (count <= 18) {
         // Dynamically scale radius based on count so they don't overlap.
         // Base circumference ~ 45 pixels per item
-        const circumference = count * 45;
+        const circumference = count * (45 * spacingScale);
         // Min radius 55 to avoid overlapping the central hub icon
-        const radius = Math.max(55, circumference / (2 * Math.PI));
+        const radius = Math.max(55 * spacingScale, circumference / (2 * Math.PI));
         outerRadius = radius;
 
         for (let i = 0; i < count; i++) {
@@ -185,7 +198,7 @@ function assignRingOffsets(stack: EntityStack): void {
             // i + 1 so we don't put the first item exactly at radius 0 (which is the hub)
             const n = i + 1;
             // Radius scales with sqrt of count to preserve uniform area/spacing
-            const radius = 35 * Math.sqrt(n);
+            const radius = (35 * spacingScale) * Math.sqrt(n);
             const angle = n * GOLDEN_ANGLE - Math.PI / 2;
             
             if (radius > outerRadius) outerRadius = radius;
@@ -247,6 +260,11 @@ export function isEntityInExpandedStack(entityId: string): boolean {
     if (!stackId) return false;
     const s = stacks.get(stackId);
     return !!s && (s.state === "expanded" || s.state === "expanding");
+}
+
+/** Returns true if the entity is part of any stack (group of 2+) */
+export function isEntityClustered(entityId: string): boolean {
+    return entityStackMembership.has(entityId);
 }
 
 /** Given an entity ID, returns the central hub's position if it's clustered, or undefined if it's standalone. */

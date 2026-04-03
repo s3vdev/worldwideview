@@ -77,6 +77,8 @@
   ],
   "exclude": [
     "node_modules",
-    "scripts"
+    "scripts",
+    "packages/wwv-data-engine",
+    "packages/*/backend"
   ]
 }

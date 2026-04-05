@@ -25,6 +25,16 @@ RUN DATABASE_URL="file:./data/wwv.db" npx prisma generate
 # Create an empty SQLite database with all tables applied
 RUN mkdir -p ./data && DATABASE_URL=file:./data/wwv.db npx prisma migrate deploy
 
+# Next.js inlines NEXT_PUBLIC_* vars at build time — must be declared as ARGs
+ARG NEXT_PUBLIC_CESIUM_ION_TOKEN
+ARG NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+ARG NEXT_PUBLIC_BING_MAPS_KEY
+ARG NEXT_PUBLIC_WWV_EDITION
+ARG NEXT_PUBLIC_WS_ENGINE_URL
+ARG NEXT_PUBLIC_ADSENSE_CLIENT_ID
+ARG NEXT_PUBLIC_SUPABASE_URL
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+
 # Run Next.js build with Webpack cache mounted
 RUN --mount=type=cache,target=/app/.next/cache NODE_OPTIONS="--max_old_space_size=3072" pnpm run build
 RUN node scripts/copy-cesium.mjs

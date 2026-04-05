@@ -39,7 +39,7 @@ export default function RootLayout({
       </head>
       <body suppressHydrationWarning>
         {children}
-        <Analytics />
+        {process.env.VERCEL && <Analytics />}
         <Script
           src="https://analytics.worldwideview.dev/script.js"
           data-website-id="2c8f6c09-2651-4a2a-af99-b8cee1612b9a"

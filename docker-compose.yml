@@ -30,6 +30,9 @@ services:
     environment:
       - "NODE_ENV=production"
       - "REDIS_URL=${REDIS_URL:-redis://redis:6379}"
+    networks:
+      - coolify
+      - default
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.data-engine.rule=Host(`dataengine.worldwideview.dev`)"
@@ -50,3 +53,7 @@ volumes:
   wwv-data:
   engine-data:
   redis-data:
+
+networks:
+  coolify:
+    external: true

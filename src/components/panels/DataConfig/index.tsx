@@ -1,6 +1,6 @@
 import { useStore } from "@/core/state/store";
 import { FilterSection } from "@/components/panels/FilterPanel";
-import { Info, Key } from "lucide-react";
+import { Info, Key, MessageSquare } from "lucide-react";
 import { useIsMobile } from "@/core/hooks/useIsMobile";
 
 import { IntelTab } from "./IntelTab";
@@ -14,6 +14,7 @@ export function DataConfigPanel() {
     const configPanelOpen = useStore((s) => s.configPanelOpen);
     const openMobilePanel = useStore((s) => s.openMobilePanel);
     const selectedEntity = useStore((s) => s.selectedEntity);
+    const setFeedbackDialogOpen = useStore((s) => s.setFeedbackDialogOpen);
     const activeTab = useStore((s) => s.activeConfigTab);
     const setActiveTab = useStore((s) => s.setActiveConfigTab);
 
@@ -87,6 +88,14 @@ export function DataConfigPanel() {
                 {activeTab === "overlay" && <OverlayTab />}
                 {activeTab === "apikeys" && <ApiKeysTab />}
             </div>
+
+            <button 
+                className="feedback-sidebar-link" 
+                onClick={() => setFeedbackDialogOpen(true)}
+            >
+                <MessageSquare size={16} />
+                Provide Feedback
+            </button>
         </aside>
     );
 }

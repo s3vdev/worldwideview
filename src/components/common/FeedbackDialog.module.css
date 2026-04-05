@@ -1,0 +1,240 @@
+.overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    padding: var(--space-xl);
+}
+
+.dialog {
+    width: 100%;
+    max-width: 600px;
+    background: #1e1e1e; /* matches screenshot background roughly */
+    border: 1px solid var(--border-medium);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    border-radius: var(--radius-md);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    color: #e2e8f0;
+}
+
+.header {
+    padding: var(--space-xl) var(--space-xl) var(--space-md);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.title {
+    font-size: 20px;
+    font-weight: 600;
+    color: #e2e8f0;
+}
+
+.closeButton {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--duration-fast) var(--ease-smooth);
+}
+
+.closeButton:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.content {
+    padding: 0 var(--space-xl) var(--space-xl);
+    overflow-y: auto;
+    max-height: 75vh;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xl);
+}
+
+.section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+}
+
+.label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #cbd5e1;
+}
+
+.description {
+    font-size: 13px;
+    color: #94a3b8;
+    line-height: 1.5;
+}
+
+.descriptionList {
+    padding-left: var(--space-xl);
+    margin-top: var(--space-xs);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.radioGroup {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.radioOption {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    cursor: pointer;
+}
+
+.radioInput {
+    accent-color: #3b82f6;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    cursor: pointer;
+}
+
+.radioLabel {
+    font-size: 14px;
+    color: #cbd5e1;
+}
+
+.textareaContainer {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.textarea {
+    width: 100%;
+    min-height: 120px;
+    background: #2a2a2a;
+    border: 1px solid #3f3f46;
+    border-radius: var(--radius-sm);
+    padding: var(--space-md);
+    color: #e2e8f0;
+    font-family: var(--font-ui);
+    font-size: 14px;
+    resize: vertical;
+    transition: border-color var(--duration-fast) var(--ease-smooth);
+}
+
+.textarea:focus {
+    outline: none;
+    border-color: #3b82f6;
+}
+
+.textarea::placeholder {
+    color: #71717a;
+}
+
+.charCount {
+    position: absolute;
+    bottom: var(--space-sm);
+    right: var(--space-sm);
+    font-size: 12px;
+    color: #ef4444; /* red as in the screenshot for empty */
+}
+
+.charCount.valid {
+    color: #71717a;
+}
+
+.checkboxGroup {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+}
+
+.checkboxOption {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    cursor: pointer;
+}
+
+.checkboxInput {
+    accent-color: #3b82f6;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    cursor: pointer;
+    background: #2a2a2a;
+    border: 1px solid #3f3f46;
+}
+
+.checkboxLabel {
+    font-size: 14px;
+    color: #cbd5e1;
+}
+
+.attachAction {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    color: #cbd5e1;
+    font-size: 14px;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+
+.attachAction:hover {
+    color: #e2e8f0;
+}
+
+.footer {
+    padding: 0 var(--space-xl) var(--space-xl);
+    display: flex;
+    align-items: center;
+}
+
+.submitButton {
+    background: #27272a;
+    color: #71717a;
+    border: 1px solid #3f3f46;
+    border-radius: var(--radius-sm);
+    padding: var(--space-sm) var(--space-xl);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--duration-fast) var(--ease-smooth);
+}
+
+.submitButton:hover:not(:disabled) {
+    background: #3f3f46;
+    color: #e2e8f0;
+}
+
+.submitButton.enabled {
+    background: #3f3f46;
+    color: #e2e8f0;
+    border-color: #52525b;
+}
+
+.submitButton.enabled:hover {
+    background: #52525b;
+}
+
+.submitButton.submitting {
+    opacity: 0.7;
+    cursor: not-allowed;
+}

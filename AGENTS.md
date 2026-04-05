@@ -192,6 +192,7 @@ Built-in plugins are instantiated in `AppShell.tsx` and registered via `PluginRe
 > - **Always** use standard `.md` file extensions for rules, skills, and workflows. 
 > - **Never** use proprietary `.mdc` extensions.
 > - **Never** reference Cursor IDE rules; we use the open `.agents/` standard.
+> - **MUST**: You MUST update Semantic Versioning numbering inside the relevant `package.json` file prior to executing any code commits, adhering strictly to the `[/commit]` workflow rules (`feat:` -> Minor, `fix/refactor/perf:` -> Patch).
 
 ---
 

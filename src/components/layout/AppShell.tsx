@@ -43,6 +43,7 @@ import { trackEvent } from "@/lib/analytics";
 import ReloadToast from "@/components/ui/ReloadToast";
 import ErrorToast from "@/components/ui/ErrorToast";
 import UnverifiedPluginBatchDialog from "@/components/marketplace/UnverifiedPluginBatchDialog";
+import { FeedbackDialog } from "@/components/common/FeedbackDialog";
 
 import { injectHostGlobals } from "@/core/plugins/hostGlobals";
 
@@ -174,6 +175,7 @@ export function AppShell() {
             <FloatingVideoManager />
             {needsReload && <ReloadToast />}
             <ErrorToast />
+            <FeedbackDialog />
             {pendingUnverified.length > 0 && (
                 <UnverifiedPluginBatchDialog
                     manifests={pendingUnverified}

@@ -32,6 +32,8 @@ export interface UISlice {
     toggleRightSidebar: () => void;
     toggleConfigPanel: () => void;
     toggleFilterPanel: () => void;
+    feedbackDialogOpen: boolean;
+    setFeedbackDialogOpen: (open: boolean) => void;
     setSelectedEntity: (entity: GeoEntity | null) => void;
     setHoveredEntity: (entity: GeoEntity | null, screenPos?: { x: number; y: number } | null) => void;
     setLockedEntityId: (id: string | null) => void;
@@ -61,6 +63,7 @@ export const createUISlice: StateCreator<AppStore, [], [], UISlice> = (set) => (
     highlightLayerId: null,
     openMobilePanel: null,
     mobileRightPanelGlow: false,
+    feedbackDialogOpen: false,
     toggleLeftSidebar: () =>
         set((state) => ({ leftSidebarOpen: !state.leftSidebarOpen })),
     toggleRightSidebar: () =>
@@ -69,6 +72,7 @@ export const createUISlice: StateCreator<AppStore, [], [], UISlice> = (set) => (
         set((state) => ({ configPanelOpen: !state.configPanelOpen })),
     toggleFilterPanel: () =>
         set((state) => ({ filterPanelOpen: !state.filterPanelOpen })),
+    setFeedbackDialogOpen: (open) => set({ feedbackDialogOpen: open }),
     setSelectedEntity: (entity) => {
         if (entity) {
             // Dynamic import to avoid circular dep (store → analytics → store)
